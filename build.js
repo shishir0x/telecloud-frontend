@@ -4,6 +4,24 @@ const esbuild = require('esbuild');
 const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+
+const STATIC_DOWNLOADS = [
+  { url: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',        out: 'static/js/pdf.min.js' },
+  { url: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', out: 'static/js/pdf.worker.min.js' },
+];
+
+function download(url, dest) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    const file = fs.createWriteStream(dest);
+    https.get(url, res => {
+      if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+      res.pipe(file);
+      file.on('finish', () => file.close(resolve));
+    }).on('error', err => { fs.unlink(dest, () => {}); reject(err); });
+  });
+}
 
 function syncAndMinifyLocales() {
   const localesDir = './static/locales';
@@ -133,6 +151,7 @@ async function main() {
   const tasks = [
     wrap('tailwind', buildTailwind),
     wrap('locales', () => Promise.resolve(syncAndMinifyLocales())),
+    ...STATIC_DOWNLOADS.map(({ url, out }) => wrap(out, () => download(url, out))),
     ...allBuilds.map(({ in: entryPoint, out: outfile, bundle }) =>
       wrap(outfile, () => esbuild.build({
         entryPoints: [entryPoint],

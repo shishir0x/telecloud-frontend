@@ -21,3 +21,4 @@ static/webfonts/
 
 # Logs
 *.log
+bun.lock

@@ -8,8 +8,8 @@ This repository contains the source code for the [TeleCloud](https://github.com/
 - `static/locales/`: JSON translation files.
 - `tailwind.config.js`: Tailwind CSS configuration.
 - `package.json`: Dependencies and build scripts.
-- `build.js`: Unified Node.js build engine (Tailwind, esbuild, sync/minify locales).
-- `sync_locales.js`: Utility script to sync missing translation keys from `en.json` into all other locale files (run via `npm run sync-locales`).
+- `build.js`: Unified build engine (Tailwind, esbuild, sync/minify locales, download static libs).
+- `sync_locales.js`: Utility script to sync missing translation keys from `en.json` into all other locale files (run via `bun run sync-locales`).
 
 ## 🌍 Contributing Translations (Localization)
 
@@ -39,35 +39,38 @@ If you would like to contribute a new language or improve an existing translatio
 ## 🛠️ Build Process
 The main TeleCloud repository integrates this as a git submodule. During the build process (Docker or GitHub Actions), the following steps are performed:
 1. Fetch this submodule into the `web/` directory.
-2. Run `build-frontend.sh` to generate minified assets (`*.min.js`, `*.min.css`, `*.min.json`).
+2. Run `build-frontend.sh` (Linux/macOS) or `build-frontend.ps1` (Windows) to generate minified assets (`*.min.js`, `*.min.css`, `*.min.json`).
 3. Compile the Go binary with embedded assets.
 
 ### What the build script does
 1. Cleans up old minified files (`*.min.css`, `*.min.js`, `*.min.json`).
 2. Optionally pulls latest changes from `origin/main` (pass `1` as first argument to enable).
-3. Verifies npm is installed, then runs `npm install`.
-4. Downloads third-party libraries from CDN:
-   - `pdf.js` and `pdf.worker.min.js` (PDF.js v3.11 from cdnjs)
-5. Executes `build.js` which handles:
+3. Verifies bun is installed — installs it automatically if not.
+4. Runs `bun install` to install dependencies.
+5. Executes `build.js` which handles (all in parallel):
    - Building Tailwind CSS via `@tailwindcss/cli`.
    - Bundling and minifying JS and CSS files via `esbuild`.
    - Minifying theme CSS files.
    - Syncing and minifying JSON locale files.
+   - Downloading static libraries from CDN:
+     - `pdf.min.js` and `pdf.worker.min.js` (PDF.js v3.11.174 from cdnjs)
 
 ### Local Development
 To manually build the frontend assets:
-1. Ensure you have **Node.js** and **npm** installed.
+1. Ensure you have **[bun](https://bun.com/)** installed.
 2. Run the build command:
    ```bash
    cd web
-   npm install
-   npm run build
+   bun install
+   bun run build.js
    ```
    *Alternatively, you can use the wrapper scripts:*
    ```bash
    # Linux/macOS
    ./build-frontend.sh
-   # Windows
+   # Windows (PowerShell)
+   .\build-frontend.ps1
+   # Windows (CMD)
    build-frontend.bat
    ```
 
