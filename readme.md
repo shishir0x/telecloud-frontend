@@ -8,8 +8,8 @@ This repository contains the source code for the [TeleCloud](https://github.com/
 - `static/locales/`: JSON translation files.
 - `tailwind.config.js`: Tailwind CSS configuration.
 - `package.json`: Dependencies and build scripts.
-- `build.js`: Unified Node.js build engine (Tailwind, esbuild, sync/minify locales).
-- `sync_locales.js`: Utility script to sync missing translation keys from `en.json` into all other locale files (run via `npm run sync-locales`).
+- `build.js`: Unified build engine (Tailwind, esbuild, sync/minify locales, download static libs).
+- `sync_locales.js`: Utility script to sync missing translation keys from `en.json` into all other locale files (run via `bun run sync-locales`).
 
 ## 🌍 Contributing Translations (Localization)
 
@@ -45,15 +45,15 @@ The main TeleCloud repository integrates this as a git submodule. During the bui
 ### What the build script does
 1. Cleans up old minified files (`*.min.css`, `*.min.js`, `*.min.json`).
 2. Optionally pulls latest changes from `origin/main` (pass `1` as first argument to enable).
-3. Verifies npm is installed, then runs `npm install`.
-4. Downloads third-party libraries from CDN:
-   - `pdf.js` and `pdf.worker.min.js` (PDF.js v3.11 from cdnjs)
-5. Executes `build.js` which handles:
+3. Verifies bun is installed — installs it automatically if not.
+4. Runs `bun install` to install dependencies.
+5. Executes `build.js` which handles (all in parallel):
    - Building Tailwind CSS via `@tailwindcss/cli`.
    - Bundling and minifying JS and CSS files via `esbuild`.
    - Minifying theme CSS files.
    - Syncing and minifying JSON locale files.
-   - Downloading static libraries (e.g. PDF.js).
+   - Downloading static libraries from CDN:
+     - `pdf.min.js` and `pdf.worker.min.js` (PDF.js v3.11.174 from cdnjs)
 
 ### Local Development
 To manually build the frontend assets:
