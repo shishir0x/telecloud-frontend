@@ -16,33 +16,17 @@ else
   echo "Pass '1' as first argument to explicitly pull origin/main before building."
 fi
 
-echo "Ensuring npm is installed..."
-if ! command -v npm > /dev/null 2>&1; then
-  echo "npm is not installed. Please install Node.js and npm from https://nodejs.org/ and try again."
-  exit 1
+echo "Ensuring bun is installed..."
+if ! command -v bun > /dev/null 2>&1; then
+  echo "bun is not installed. Installing bun..."
+  curl -fsSL https://bun.sh/install | bash || { echo "Failed to install bun. Please install it manually from https://bun.com/ and try again."; exit 1; }
+  export PATH="$HOME/.bun/bin:$PATH"
 fi
 
-echo "Installing npm dependencies..."
-npm install
-
-echo "Downloading frontend libraries..."
-mkdir -p static/js static/css
-
-# Helper function for downloading with retry/error check
-download_lib() {
-    local url=$1
-    local out=$2
-    echo "Downloading $out..."
-    curl -sSL "$url" -o "$out"
-}
-
-download_lib "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" "static/js/pdf.min.js"
-download_lib "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js" "static/js/pdf.worker.min.js"
-
-
-
+echo "Installing dependencies..."
+bun install
 
 echo "Minifying JS, CSS, locales, and themes..."
-node build.js
+bun run build.js
 
 echo "Frontend build complete!"

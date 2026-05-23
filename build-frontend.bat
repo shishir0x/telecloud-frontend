@@ -22,26 +22,22 @@ if "%TELECLOUD_PULL_LATEST%"=="1" (
     echo Set TELECLOUD_PULL_LATEST=1 to explicitly pull origin/main before building.
 )
 
-echo Ensuring npm is installed...
-where npm >nul 2>&1
+echo Ensuring bun is installed...
+where bun >nul 2>&1
 if errorlevel 1 (
-  echo npm is not installed. Please install Node.js and npm from https://nodejs.org/ and try again.
-  exit /b 1
+  echo bun is not installed. Installing bun...
+  powershell -c "irm bun.sh/install.ps1 | iex"
+  if errorlevel 1 (
+    echo Failed to install bun. Please install it manually from https://bun.com/ and try again.
+    exit /b 1
+  )
 )
 
-echo Installing npm dependencies...
-call npm install
-echo Downloading frontend libraries...
-if not exist static\js mkdir static\js
-if not exist static\css mkdir static\css
-
-echo Downloading static\js\pdf.min.js...
-curl -sSL "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" -o "static\js\pdf.min.js"
-echo Downloading static\js\pdf.worker.min.js...
-curl -sSL "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js" -o "static\js\pdf.worker.min.js"
+echo Installing dependencies...
+call bun install
 
 echo Minifying JS, CSS, locales, and themes...
-call node build.js
+call bun run build.js
 if errorlevel 1 (
     echo Build failed. See errors above.
     exit /b 1
