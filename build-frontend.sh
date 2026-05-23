@@ -16,7 +16,11 @@ else
   echo "Pass '1' as first argument to explicitly pull origin/main before building."
 fi
 
-echo "Ensuring bun is installed..."
+# Add Bun to PATH if it exists in the default installation directory
+if [ -d "$HOME/.bun/bin" ]; then
+  export PATH="$HOME/.bun/bin:$PATH"
+fi
+
 if ! command -v bun > /dev/null 2>&1; then
   echo "bun is not installed. Installing bun..."
   curl -fsSL https://bun.sh/install | bash || { echo "Failed to install bun. Please install it manually from https://bun.com/ and try again."; exit 1; }
