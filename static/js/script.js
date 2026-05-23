@@ -15,6 +15,7 @@ import Plyr from 'plyr';
 import Artplayer from 'artplayer';
 import Prism from 'prismjs';
 
+
 // Import Prism languages
 import 'prismjs/components/prism-json';
 import 'prismjs/components/prism-javascript';
@@ -31,12 +32,189 @@ window.Artplayer = Artplayer;
 Artplayer.option.logger = false;
 window.Prism = Prism;
 
+const artplayerI18n = {
+    'vi': {
+        'Play': 'Phát',
+        'Pause': 'Tạm dừng',
+        'Play Speed': 'Tốc độ phát',
+        'Playback Rate': 'Tốc độ phát',
+        'Aspect Ratio': 'Tỉ lệ khung hình',
+        'Normal': 'Bình thường',
+        'Flip': 'Lật video',
+        'Horizontal': 'Xoay ngang',
+        'Vertical': 'Xoay dọc',
+        'Fullscreen': 'Toàn màn hình',
+        'Web Fullscreen': 'Toàn màn hình Web',
+        'Mini Player': 'Trình phát thu nhỏ',
+        'PIP': 'Ảnh trong ảnh',
+        'Volume': 'Âm lượng',
+        'Mute': 'Tắt tiếng',
+        'Reconnect': 'Kết nối lại',
+        'Screenshot': 'Chụp màn hình',
+        'Subtitle': 'Phụ đề',
+        'Video info': 'Thông tin video',
+        'Close': 'Đóng',
+    }
+};
+
+function findSubtitlesForVideo(videoFilename, filesList, isShare, shareToken) {
+    if (!videoFilename || !filesList || filesList.length === 0) return [];
+    
+    const lastDot = videoFilename.lastIndexOf('.');
+    const videoBase = lastDot !== -1 ? videoFilename.substring(0, lastDot) : videoFilename;
+    const videoBaseLower = videoBase.toLowerCase();
+
+    return filesList
+        .filter(f => {
+            if (f.is_folder) return false;
+            const ext = f.filename.split('.').pop().toLowerCase();
+            if (!['srt', 'vtt', 'ass'].includes(ext)) return false;
+            
+            const subLastDot = f.filename.lastIndexOf('.');
+            const subBase = subLastDot !== -1 ? f.filename.substring(0, subLastDot) : f.filename;
+            const subBaseLower = subBase.toLowerCase();
+
+            return subBaseLower === videoBaseLower || subBaseLower.startsWith(videoBaseLower + '.');
+        })
+        .map(f => {
+            const ext = f.filename.split('.').pop().toLowerCase();
+            return {
+                html: f.filename,
+                url: isShare ? `/s/${shareToken}/file/${f.id}/stream` : `/api/files/${f.id}/stream`,
+                type: ext
+            };
+        });
+}
+
+function buildArtplayerSubtitleSetting(videoFilename, filesList, isShare, shareToken, tFunc) {
+    const matchedSubs = findSubtitlesForVideo(videoFilename, filesList, isShare, shareToken);
+    
+    const selector = [
+        {
+            html: tFunc ? tFunc('subtitles_off') : 'Off',
+            default: matchedSubs.length === 0,
+        }
+    ];
+
+    matchedSubs.forEach((sub, index) => {
+        selector.push({
+            html: sub.html,
+            url: sub.url,
+            type: sub.type,
+            default: index === 0,
+        });
+    });
+
+    selector.push({
+        html: tFunc ? tFunc('subtitles_local') : 'Load from local...',
+        isLocal: true,
+    });
+
+    return {
+        width: 250,
+        html: tFunc ? tFunc('subtitles') : 'Subtitles',
+        tooltip: matchedSubs.length > 0 ? matchedSubs[0].html : (tFunc ? tFunc('subtitles_off') : 'Off'),
+        selector: selector,
+        onSelect: function (item) {
+            if (item.isLocal) {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.vtt,.srt,.ass';
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const url = URL.createObjectURL(file);
+                        const ext = file.name.split('.').pop().toLowerCase();
+                        this.subtitle.url = url;
+                        this.subtitle.type = ext;
+                        this.subtitle.show = true;
+                        
+                        this.setting.update({
+                            html: tFunc ? tFunc('subtitles') : 'Subtitles',
+                            tooltip: file.name,
+                        });
+                    }
+                };
+                input.click();
+                return 'Loading...';
+            } else if (item.url) {
+                this.subtitle.url = item.url;
+                this.subtitle.type = item.type;
+                this.subtitle.show = true;
+                return item.html;
+            } else {
+                this.subtitle.show = false;
+                return tFunc ? tFunc('subtitles_off') : 'Off';
+            }
+        }
+    };
+}
+
+window.registerComicLazyImage = function(el) {
+    // Mark wrapper as loading immediately so shimmer shows
+    const wrapper = el.parentElement;
+    if (wrapper) wrapper.classList.add('comic-img-loading');
+
+    if (!window._comicIntersectionObserver) {
+        window._comicIntersectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    const dataSrc = img.getAttribute('data-src');
+                    if (dataSrc && img.getAttribute('src') !== dataSrc) {
+                        // Attach listeners BEFORE changing src so they fire for the real image
+                        img.addEventListener('load', () => {
+                            img.classList.add('comic-img-ready');
+                            const w = img.parentElement;
+                            if (w) w.classList.remove('comic-img-loading');
+                        }, { once: true });
+                        img.addEventListener('error', () => {
+                            const w = img.parentElement;
+                            if (w) w.classList.remove('comic-img-loading');
+                        }, { once: true });
+                        img.setAttribute('src', dataSrc);
+                    }
+                }
+            });
+        }, {
+            rootMargin: '120% 0px 120% 0px'
+        });
+    }
+    window._comicIntersectionObserver.observe(el);
+};
+
+window.registerPdfLazyPage = function(el, pageNum) {
+    if (!window._pdfIntersectionObserver) {
+        window._pdfIntersectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const wrapper = entry.target;
+                const pageNo = parseInt(wrapper.getAttribute('data-page'), 10);
+                if (entry.isIntersecting) {
+                    window.dispatchEvent(new CustomEvent('tc-render-pdf-page', { detail: { pageNum: pageNo } }));
+                } else {
+                    const canvas = wrapper.querySelector('canvas');
+                    if (canvas && canvas.getAttribute('data-rendered') === 'true') {
+                        const context = canvas.getContext('2d');
+                        if (context) {
+                            context.clearRect(0, 0, canvas.width, canvas.height);
+                        }
+                        canvas.removeAttribute('data-rendered');
+                    }
+                }
+            });
+        }, {
+            rootMargin: '100% 0px 100% 0px'
+        });
+    }
+    window._pdfIntersectionObserver.observe(el);
+};
+
 // Expose main app functions to window for Alpine.js x-data
 window.cloudApp = cloudApp;
 window.shareApp = shareApp;
 window.shareFileApp = shareFileApp;
 
-function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnabled = false, webdavUser = '', webdavPassword = '', uploadAPIEnabled = false, uploadAPIKey = '', globalWebdavEnabled = true, globalAPIEnabled = true, webauthnRPID = '', webauthnOrigins = '', initialTheme = 'system', s3Enabled = false, s3AccessKey = '', s3SecretKey = '', globalS3Enabled = true, forceChange = false) {
+function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnabled = false, webdavUser = '', webdavPassword = '', uploadAPIEnabled = false, uploadAPIKey = '', globalWebdavEnabled = true, globalAPIEnabled = true, webauthnRPID = '', webauthnOrigins = '', initialTheme = 'system', s3Enabled = false, s3AccessKey = '', s3SecretKey = '', globalS3Enabled = true, forceChange = false, logGroupId = '', initialBotTokens = '', initialBotStatuses = '{}') {
     return {
         isLoggedIn: initialIsLoggedIn,
         isAdmin: isAdmin,
@@ -79,6 +257,138 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         tasks: {},
         backupInfo: { last_time: '', status: '', is_running: false, sqlite_only: false },
         restoreLoading: false,
+        logGroupId: logGroupId,
+        botTokens: initialBotTokens ? initialBotTokens.split(',').filter(t => t.trim() !== '').map(t => ({ value: t, isSaved: true })) : [],
+        botStatuses: initialBotStatuses ? JSON.parse(initialBotStatuses) : {},
+        botLoading: false,
+        restartingApp: false,
+        addBotToken() {
+            this.botTokens.push({ value: '', isSaved: false });
+        },
+        removeBotToken(index) {
+            this.botTokens.splice(index, 1);
+        },
+        maskToken(token) {
+            if (!token) return '';
+            const colonIdx = token.indexOf(':');
+            if (colonIdx !== -1) {
+                return token.substring(0, colonIdx) + '***';
+            }
+            if (token.length > 7) {
+                return token.substring(0, 7) + '***';
+            }
+            return token + '***';
+        },
+        formatBotError(err) {
+            if (!err) return '';
+            let errStr = err.toLowerCase();
+            if (errStr === 'offline') {
+                return this.t('err_bot_offline') || 'Bot is offline/disabled.';
+            }
+            if (errStr === 'failed') {
+                return this.t('err_bot_failed') || 'Bot failed to initialize at startup.';
+            }
+            if (errStr.includes('invalid') || errStr.includes('400') || errStr.includes('unauthorized')) {
+                if (errStr.includes('peer') || errStr.includes('channel') || errStr.includes('chat') || errStr.includes('resolve')) {
+                    return this.t('err_bot_peer_invalid') || 'Bot is not added to the Log Group or lacks permission to send messages.';
+                }
+                return this.t('err_bot_token_invalid') || 'Invalid or expired bot token. Please check again.';
+            }
+            if (errStr.includes('write_forbidden') || errStr.includes('forbidden') || errStr.includes('write')) {
+                return this.t('err_bot_write_forbidden') || 'Bot lacks Admin permission in the Log Group to send messages.';
+            }
+            if (errStr.includes('timeout') || errStr.includes('deadline')) {
+                return this.t('err_bot_timeout') || 'Telegram connection timed out. Please try again.';
+            }
+            return err;
+        },
+        async saveBotPool() {
+            let filteredTokens = this.botTokens.map(t => t.value.trim()).filter(t => t !== '');
+            this.botLoading = true;
+            try {
+                let r = await fetch('/api/settings/bot-pool', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': TeleCloud.getCsrfToken()
+                    },
+                    body: JSON.stringify({ tokens: filteredTokens })
+                });
+                let res = await r.json();
+                if (!r.ok) throw new Error(res.error || 'Failed to save bot pool');
+
+                this.botStatuses = {};
+                let hasError = false;
+                if (res.results) {
+                    res.results.forEach(item => {
+                        this.botStatuses[item.token] = item.status === 'success' ? 'success' : 'error:' + item.error;
+                        if (item.status !== 'success') {
+                            hasError = true;
+                        }
+                    });
+                }
+
+                // Update isSaved state for successfully verified tokens
+                this.botTokens.forEach(t => {
+                    const status = this.botStatuses[t.value];
+                    if (status === 'success') {
+                        t.isSaved = true;
+                    }
+                });
+
+                if (hasError) {
+                    this.showToast(this.t('bot_save_some_failed') || 'Some bot tokens failed verification', 'warning');
+                } else {
+                    this.showToast(this.t('toast_settings_saved'), 'success');
+                }
+            } catch (e) {
+                this.showToast(e.message, 'error');
+            } finally {
+                this.botLoading = false;
+            }
+        },
+        async restartApp() {
+            const confirmed = await this.customConfirm(
+                this.t('system_restart') || 'Restart Application',
+                this.t('confirm_restart_app') || 'Are you sure you want to restart the application? This will temporarily interrupt active operations.',
+                true // isDanger
+            );
+            if (!confirmed) {
+                return;
+            }
+            this.restartingApp = true;
+            try {
+                let r = await fetch('/api/settings/restart', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': TeleCloud.getCsrfToken()
+                    }
+                });
+                let res = await r.json();
+                if (!r.ok) throw new Error(res.error || 'Failed to restart application');
+                
+                this.showToast(this.t('toast_restarting') || 'Server is restarting, please wait...', 'info');
+                
+                // Poll server status until it comes back up
+                setTimeout(() => {
+                    let checkInterval = setInterval(async () => {
+                        try {
+                            let ping = await fetch('/api/system/status');
+                            if (ping.ok) {
+                                clearInterval(checkInterval);
+                                this.showToast(this.t('toast_restart_success') || 'Server restarted successfully!', 'success');
+                                setTimeout(() => window.location.reload(), 1000);
+                            }
+                        } catch (e) {
+                            // Server is still down, keep polling
+                        }
+                    }, 2000);
+                }, 3000);
+            } catch (e) {
+                this.showToast(e.message, 'error');
+                this.restartingApp = false;
+            }
+        },
         setTheme(theme) {
             this.currentTheme = theme;
             TeleCloud.applyTheme(theme);
@@ -179,6 +489,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         userForm: { username: '', password: '' },
         isCreatingUser: false,
         isLoggingIn: false,
+        isPasskeyLoading: false,
         isLoading: false, 
         isRefreshing: false,
         isTrashLoading: false,
@@ -900,10 +1211,19 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         playerInstance: null,
         imageViewer: { show: false, src: '', filename: '' },
         lightboxLoading: false,
-        fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false },
+        comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false },
+        epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         modal: { show: false, type: 'alert', title: '', message: '', input: '', resolve: null, isDanger: false, inputType: 'text', applyToAll: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
         init() { 
+            window.addEventListener('tc-render-pdf-page', (e) => {
+                if (this.pdfViewer && this.pdfViewer.show && this.pdfViewer.scrollMode === 'continuous') {
+                    this.renderPdfContinuousPage(e.detail.pageNum);
+                }
+            });
+
             window.addEventListener('tc-translations-loaded', (e) => {
                 this.lang = '';
                 this.$nextTick(() => { this.lang = e.detail.lang; });
@@ -946,6 +1266,36 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     if (hasActiveUploads) {
                         e.preventDefault();
                         e.returnValue = ''; // Standard way to trigger the browser's confirmation dialog
+                    }
+                });
+
+                // Listen for global paste events to upload files/images from clipboard
+                window.addEventListener('paste', (e) => {
+                    const active = document.activeElement;
+                    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable || active.getAttribute('contenteditable') === 'true')) {
+                        return;
+                    }
+
+                    const items = (e.clipboardData || window.clipboardData)?.items;
+                    if (!items) return;
+
+                    const files = [];
+                    for (const item of items) {
+                        if (item.kind === 'file') {
+                            const file = item.getAsFile();
+                            if (file) {
+                                files.push(file);
+                            }
+                        }
+                    }
+
+                    if (files.length > 0) {
+                        e.preventDefault();
+                        this.customConfirm(this.t('paste_confirm_title'), this.t('paste_confirm_msg')).then((confirmed) => {
+                            if (confirmed) {
+                                this.uploadFiles(files);
+                            }
+                        });
                     }
                 });
             }
@@ -1326,6 +1676,8 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 this.showToast(this.t('passkey_not_supported'), 'error');
                 return;
             }
+            if (this.isPasskeyLoading) return;
+            this.isPasskeyLoading = true;
             try {
                 const beginResp = await fetch('/api/passkey/login/begin' + (this.username ? '?username=' + this.username : ''));
                 const options = await beginResp.json();
@@ -1359,6 +1711,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 });
                 const result = await finishResp.json();
                 if (result.status === 'force_password_change') {
+                    this.isPasskeyLoading = false;
                     await this.customAlert(this.t('force_password_change_title'), this.t('force_password_change_msg'));
                     const newPass = await this.customPrompt(this.t('new_password'), "", "password");
                     if (!newPass) return;
@@ -1384,6 +1737,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     throw new Error(result.error || this.t('err_passkey_auth_failed'));
                 }
             } catch (err) {
+                this.isPasskeyLoading = false;
                 if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
                 console.error(err);
                 this.showToast(this.t('passkey_error') + ': ' + err.message, 'error');
@@ -1767,8 +2121,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
 
         async handleDrop(e) { 
             this.dragOver = false; 
-            const files = await this.scanFiles(e.dataTransfer.items);
-            this.uploadFiles(files); 
+            await this.handleDroppedData(e.dataTransfer); 
         },
         handleUploadModalSelect(e) { 
             this.uploadFiles(Array.from(e.target.files)); 
@@ -1778,8 +2131,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         async handleUploadModalDrop(e) { 
             this.uploadDragOver = false; 
             this.uploadModal = false; 
-            const files = await this.scanFiles(e.dataTransfer.items);
-            this.uploadFiles(files); 
+            await this.handleDroppedData(e.dataTransfer); 
         },
         async scanFiles(items) {
             const files = [];
@@ -1820,7 +2172,186 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             }
             return files;
         },
+        async handleDroppedData(dataTransfer) {
+            // Synchronously extract all values from dataTransfer before any async call
+            // as the browser clears dataTransfer after the event loop turn finishes.
+            const urlData = dataTransfer.getData('URL');
+            const uriListData = dataTransfer.getData('text/uri-list');
+            const htmlData = dataTransfer.getData('text/html');
+            const dtFiles = dataTransfer.files ? Array.from(dataTransfer.files) : [];
+            
+            const entries = [];
+            const directFiles = [];
+            if (dataTransfer.items) {
+                for (const item of dataTransfer.items) {
+                    if (item.webkitGetAsEntry) {
+                        const entry = item.webkitGetAsEntry();
+                        if (entry) {
+                            entries.push(entry);
+                        }
+                    } else if (item.kind === 'file') {
+                        const file = item.getAsFile();
+                        if (file) {
+                            directFiles.push(file);
+                        }
+                    }
+                }
+            }
+
+            let files = [];
+            if (entries.length > 0) {
+                const scan = async (entry, path = '') => {
+                    if (entry.isFile) {
+                        const file = await new Promise((resolve) => entry.file(resolve));
+                        if (path) file.relativeDir = path.endsWith('/') ? path.slice(0, -1) : path;
+                        files.push(file);
+                    } else if (entry.isDirectory) {
+                        const reader = entry.createReader();
+                        const entriesList = await new Promise((resolve) => {
+                            let allEntries = [];
+                            const read = () => {
+                                reader.readEntries((results) => {
+                                    if (results.length) {
+                                        allEntries = allEntries.concat(results);
+                                        read();
+                                    } else {
+                                        resolve(allEntries);
+                                    }
+                                });
+                            };
+                            read();
+                        });
+                        for (const child of entriesList) {
+                            await scan(child, path + entry.name + '/');
+                        }
+                    }
+                };
+                for (const entry of entries) {
+                    await scan(entry);
+                }
+            } else if (directFiles.length > 0) {
+                files = directFiles;
+            } else if (dtFiles.length > 0) {
+                files = dtFiles;
+            }
+
+            if (files.length === 0) {
+                let imageUrl = '';
+                
+                // Parse text/html first to grab the actual <img> tag src (e.g. from Facebook CDN)
+                if (htmlData) {
+                    try {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(htmlData, 'text/html');
+                        const img = doc.querySelector('img');
+                        if (img && img.src) {
+                            imageUrl = img.src;
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse dragged HTML data:", e);
+                    }
+                }
+                
+                // Fallback to URL data if no img tag found in HTML
+                if (!imageUrl) {
+                    imageUrl = urlData || uriListData;
+                }
+
+                if (imageUrl) {
+                    if (imageUrl.startsWith('data:')) {
+                        try {
+                            const parts = imageUrl.split(',');
+                            const mime = parts[0].match(/:(.*?);/)[1];
+                            const bstr = atob(parts[1]);
+                            let n = bstr.length;
+                            const u8arr = new Uint8Array(n);
+                            while (n--) {
+                                u8arr[n] = bstr.charCodeAt(n);
+                            }
+                            const blob = new Blob([u8arr], { type: mime });
+                            const ext = mime.split('/')[1] || 'png';
+                            const filename = `dropped_image_${Date.now()}.${ext}`;
+                            const file = new File([blob], filename, { type: mime });
+                            files.push(file);
+                            this.uploadFiles(files);
+                        } catch (err) {
+                            console.error("Failed to parse base64 dropped image:", err);
+                        }
+                    } else {
+                        const isInternal = imageUrl.startsWith('/') || imageUrl.startsWith(window.location.origin);
+                        
+                        if (isInternal) {
+                            try {
+                                const res = await fetch(imageUrl);
+                                if (res.ok) {
+                                    const blob = await res.blob();
+                                    const urlParts = imageUrl.split('/');
+                                    let namePart = urlParts[urlParts.length - 1].split('?')[0];
+                                    if (!namePart || !namePart.includes('.')) {
+                                        const ext = blob.type.split('/')[1] || 'jpg';
+                                        namePart = `dropped_image_${Date.now()}.${ext}`;
+                                    }
+                                    const file = new File([blob], namePart, { type: blob.type });
+                                    files.push(file);
+                                    this.uploadFiles(files);
+                                    return;
+                                }
+                            } catch (err) {
+                                console.log("Client fetch of internal URL failed:", err);
+                            }
+                        }
+
+                        // For external URLs, bypass client-side fetch to prevent violating Content Security Policy (connect-src) 
+                        // and CORS restrictions. Directly request server-side remote download.
+                        this.showToast(this.t('remote_adding') || 'Đang yêu cầu máy chủ tải ảnh...', 'info');
+                        try {
+                            const taskId = 'remote_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+                            const displayName = imageUrl.split('/').pop().split('?')[0] || 'dropped_image.jpg';
+                            
+                            this.uploadQueue.push({
+                                id: taskId,
+                                name: 'URL: ' + displayName,
+                                progress: 0,
+                                statusText: this.t('preparing_upload') || 'Đang chuẩn bị...',
+                                isCancelled: false,
+                                hasError: false,
+                                status: 'preparing',
+                                size: 0,
+                                singlePhase: true,
+                                remoteUrl: imageUrl,
+                                targetPath: this.currentPath,
+                                overwrite: false
+                            });
+
+                            let fd = new FormData();
+                            fd.append('url', imageUrl);
+                            fd.append('path', this.currentPath);
+                            fd.append('overwrite', 'false');
+                            fd.append('task_id', taskId);
+
+                            let res = await fetch('/api/remote-upload', {
+                                method: 'POST',
+                                body: fd,
+                                headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() }
+                            });
+
+                            if (!res.ok) {
+                                let d = await res.json();
+                                this.uploadQueue = this.uploadQueue.filter(t => t.id !== taskId);
+                                this.showToast(this.handleCommonError(d.error, 'status_error') + ': ' + imageUrl, 'error');
+                            }
+                        } catch (remoteErr) {
+                            console.error("Server-side Remote Upload failed:", remoteErr);
+                            this.showToast(this.t('remote_failed') || 'Tải ảnh qua máy chủ thất bại', 'error');
+                        }
+                    }
+                }
+            } else {
+                this.uploadFiles(files);
+            }
+        },
         async uploadFiles(fileList) {
+            if (!fileList || fileList.length === 0) return;
             if (fileList.length > 500) {
                 this.showToast(this.t('err_max_files').replace('{n}', 500), 'error');
                 return;
@@ -2389,8 +2920,16 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         },
         closeFileInfoModal() {
             this.fileInfoModal.show = false;
+            if (this.playerInstance) {
+                try {
+                    this.playerInstance.destroy();
+                } catch(e) {
+                    console.error("Error destroying player:", e);
+                }
+                this.playerInstance = null;
+            }
             if (this.plyrInstance) { this.plyrInstance.destroy(); this.plyrInstance = null; }
-            setTimeout(() => { if (!this.fileInfoModal.show) { this.fileInfoModal.isMedia = false; this.fileInfoModal.mediaHtml = ''; this.fileInfoModal.isLarge = false; this.fileInfoModal.isPreviewLoading = false; this.fileInfoModal.needsLoad = false; this.fileInfoModal.tooLarge = false; } }, 300);
+            setTimeout(() => { if (!this.fileInfoModal.show) { this.fileInfoModal.isMedia = false; this.fileInfoModal.mediaHtml = ''; this.fileInfoModal.isLarge = false; this.fileInfoModal.isPreviewLoading = false; this.fileInfoModal.needsLoad = false; this.fileInfoModal.tooLarge = false; this.fileInfoModal.bypassWarning = false; this.fileInfoModal.unsupportedMedia = false; } }, 300);
         },
         openImageViewer(src, filename) {
             if (this.imageViewer.src === src) {
@@ -2400,6 +2939,1177 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.lightboxLoading = true;
             this.imageViewer = { show: true, src, filename };
         },
+        saveComicProgress() {
+            if (this.comicViewer.file && this.comicViewer.file.id) {
+                try {
+                    localStorage.setItem(`comic-page-${this.comicViewer.file.id}`, this.comicViewer.currentPageIndex);
+                } catch(e) {}
+            }
+        },
+        toggleComicScrollMode() {
+            const nextMode = this.comicViewer.scrollMode === 'page' ? 'continuous' : 'page';
+            this.comicViewer.scrollMode = nextMode;
+            if (nextMode === 'continuous') {
+                this.$nextTick(() => {
+                    setTimeout(() => {
+                        const container = document.getElementById('comic-continuous-container') || 
+                                          document.getElementById('share-comic-continuous-container') || 
+                                          document.getElementById('share-folder-comic-continuous-container');
+                        if (container) {
+                            const wrapper = container.querySelector(`.comic-page-wrapper[data-index="${this.comicViewer.currentPageIndex}"]`);
+                            if (wrapper) {
+                                wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                            }
+                        }
+                    }, 100);
+                });
+            } else {
+                this.loadComicPage();
+            }
+        },
+        openComicViewer(file, isShare = false, shareToken = '') {
+            this.comicViewer.show = true;
+            this.comicViewer.file = file;
+            this.comicViewer.pages = [];
+            this.comicViewer.pageUrls = [];
+            
+            let savedPage = 0;
+            if (file && file.id) {
+                try {
+                    const saved = localStorage.getItem(`comic-page-${file.id}`);
+                    if (saved !== null) {
+                        savedPage = parseInt(saved, 10) || 0;
+                    }
+                } catch(e) {}
+            }
+            this.comicViewer.currentPageIndex = savedPage;
+            
+            this.comicViewer.scrollMode = 'page';
+            this.comicViewer.loading = true;
+            this.comicViewer.settingsOpen = false;
+            
+            const hasShareToken = !!(this.shareToken || this.token || shareToken);
+            const token = this.shareToken || this.token || shareToken;
+            
+            const listUrl = hasShareToken 
+                ? (file.id ? `/s/${token}/file/${file.id}/cbz/list` : `/s/${token}/cbz/list`)
+                : `/api/files/${file.id}/cbz/list`;
+
+            fetch(listUrl)
+                .then(res => {
+                    if (!res.ok) throw new Error("Failed to load comic structure");
+                    return res.json();
+                })
+                .then(data => {
+                    if (!this.comicViewer.show || !this.comicViewer.file || String(this.comicViewer.file.id) !== String(file.id) || this.comicViewer.file.filename !== file.filename) return;
+                    this.comicViewer.pages = data.pages || [];
+                    
+                    if (file) {
+                        this.comicViewer.pageUrls = this.comicViewer.pages.map(pagePath => {
+                            return hasShareToken
+                                ? (file.id ? `/s/${token}/file/${file.id}/cbz/page?path=${encodeURIComponent(pagePath)}` : `/s/${token}/cbz/page?path=${encodeURIComponent(pagePath)}`)
+                                : `/api/files/${file.id}/cbz/page?path=${encodeURIComponent(pagePath)}`;
+                        });
+                    } else {
+                        this.comicViewer.pageUrls = [];
+                    }
+                    
+                    this.comicViewer.loading = false;
+                    if (this.comicViewer.pages.length > 0) {
+                        if (this.comicViewer.currentPageIndex >= this.comicViewer.pages.length) {
+                            this.comicViewer.currentPageIndex = 0;
+                        }
+                        this.loadComicPage(token);
+                        this.preloadNextComicPage();
+
+                        this.$nextTick(() => {
+                            const container = document.getElementById('comic-continuous-container') || 
+                                              document.getElementById('share-comic-continuous-container') || 
+                                              document.getElementById('share-folder-comic-continuous-container');
+                            if (container) {
+                                container.onscroll = () => {
+                                    if (this.comicViewer.scrollMode !== 'continuous') return;
+                                    const wrappers = container.querySelectorAll('.comic-page-wrapper');
+                                    let activeIndex = 0;
+                                    let minDiff = Infinity;
+                                    wrappers.forEach((wrapper, idx) => {
+                                        const rect = wrapper.getBoundingClientRect();
+                                        const diff = Math.abs(rect.top);
+                                        if (diff < minDiff) {
+                                            minDiff = diff;
+                                            activeIndex = idx;
+                                        }
+                                    });
+                                    if (activeIndex !== this.comicViewer.currentPageIndex && activeIndex >= 0 && activeIndex < this.comicViewer.pages.length) {
+                                        this.comicViewer.currentPageIndex = activeIndex;
+                                        this.saveComicProgress();
+                                    }
+                                };
+                            }
+
+                            setTimeout(() => {
+                                if (this.comicViewer.scrollMode === 'continuous') {
+                                    if (container) {
+                                        const wrapper = container.querySelector(`.comic-page-wrapper[data-index="${this.comicViewer.currentPageIndex}"]`);
+                                        if (wrapper) {
+                                            wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                                        }
+                                    }
+                                }
+                            }, 400);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    this.showToast(this.t('err_loading_comic'), 'error');
+                    this.comicViewer.show = false;
+                    this.comicViewer.loading = false;
+                });
+        },
+        loadComicPage(tokenOpt) {
+            if (this.comicViewer.currentPageIndex < 0 || this.comicViewer.currentPageIndex >= this.comicViewer.pages.length) return;
+            const file = this.comicViewer.file;
+            if (!file) return;
+            
+            const pageUrl = this.comicViewer.pageUrls[this.comicViewer.currentPageIndex];
+            if (!pageUrl) return;
+            
+            // Set loading = true; the DOM img's @load/@error events will clear it
+            this.comicViewer.pageLoading = true;
+        },
+        nextComicPage() {
+            if (this.comicViewer.currentPageIndex < this.comicViewer.pages.length - 1) {
+                this.comicViewer.currentPageIndex++;
+                this.loadComicPage();
+                this.preloadNextComicPage();
+                this.saveComicProgress();
+            }
+        },
+        prevComicPage() {
+            if (this.comicViewer.currentPageIndex > 0) {
+                this.comicViewer.currentPageIndex--;
+                this.loadComicPage();
+                this.saveComicProgress();
+            }
+        },
+        preloadNextComicPage() {
+            const nextIndex = this.comicViewer.currentPageIndex + 1;
+            if (nextIndex < this.comicViewer.pages.length) {
+                const file = this.comicViewer.file;
+                if (!file) return;
+                
+                const pageUrl = this.comicViewer.pageUrls[nextIndex];
+                if (!pageUrl) return;
+                
+                const img = new Image();
+                img.src = pageUrl;
+            }
+        },
+        closeComicViewer() {
+            // 1. Kill rAF immediately without triggering Alpine reactivity
+            if (window._comicAutoScrollRaf) {
+                cancelAnimationFrame(window._comicAutoScrollRaf);
+                window._comicAutoScrollRaf = null;
+            }
+            if (window._comicIntersectionObserver) {
+                window._comicIntersectionObserver.disconnect();
+                window._comicIntersectionObserver = null;
+            }
+            // 2. Hide immediately to trigger the Alpine.js leaving transition
+            this.comicViewer.show = false;
+            this.comicViewer.autoScrollActive = false;
+            // 3. Snapshot the closing file identity and blob URLs for later cleanup
+            const closingFile = this.comicViewer.file;
+            const urls = this.comicViewer.pageUrls ? [...this.comicViewer.pageUrls] : [];
+            // 4. Defer nuke and state reset to let transition complete cleanly.
+            //    Guard: only clear state if the viewer has NOT been reopened for another file
+            //    during the 400ms window (prevents the deferred null from blanking a fresh open).
+            setTimeout(() => {
+                if (this.comicViewer.show) return; // viewer was reopened — leave state alone
+                if (this.comicViewer.file && closingFile &&
+                    (String(this.comicViewer.file.id) !== String(closingFile.id) ||
+                     this.comicViewer.file.filename !== closingFile.filename)) return; // different file opened
+                const pageImg = document.getElementById('comic-viewer-img') || document.getElementById('comic-viewer-img-file') || document.getElementById('comic-viewer-img-folder');
+                if (pageImg) pageImg.removeAttribute('src');
+                this.comicViewer.file = null;
+                this.comicViewer.pages = [];
+                this.comicViewer.pageUrls = [];
+                this.comicViewer.settingsOpen = false;
+                urls.forEach(u => { if (u && u.startsWith('blob:')) try { URL.revokeObjectURL(u); } catch(e) {} });
+            }, 400);
+        },
+        toggleComicAutoScroll() {
+            this.comicViewer.autoScrollActive = !this.comicViewer.autoScrollActive;
+            if (this.comicViewer.autoScrollActive) {
+                this.startComicAutoScroll();
+            } else {
+                this.stopComicAutoScroll();
+            }
+        },
+        startComicAutoScroll() {
+            if (window._comicAutoScrollRaf) {
+                cancelAnimationFrame(window._comicAutoScrollRaf);
+            }
+            const scrollLoop = () => {
+                if (!this.comicViewer.show || !this.comicViewer.autoScrollActive) {
+                    this.comicViewer.autoScrollActive = false;
+                    if (window._comicAutoScrollRaf) {
+                        cancelAnimationFrame(window._comicAutoScrollRaf);
+                        window._comicAutoScrollRaf = null;
+                    }
+                    return;
+                }
+                try {
+                    const container = document.getElementById('comic-continuous-container') || 
+                                      document.getElementById('share-comic-continuous-container') || 
+                                      document.getElementById('share-folder-comic-continuous-container');
+                    if (container) {
+                        container.scrollTop += Math.pow(this.comicViewer.autoScrollSpeed, 2) * 0.25;
+                    } else {
+                        this.stopComicAutoScroll();
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Comic auto-scroll error:", e);
+                    this.stopComicAutoScroll();
+                    return;
+                }
+                window._comicAutoScrollRaf = requestAnimationFrame(scrollLoop);
+            };
+            window._comicAutoScrollRaf = requestAnimationFrame(scrollLoop);
+        },
+        stopComicAutoScroll() {
+            this.comicViewer.autoScrollActive = false;
+            if (window._comicAutoScrollRaf) {
+                cancelAnimationFrame(window._comicAutoScrollRaf);
+                window._comicAutoScrollRaf = null;
+            }
+        },
+        changeComicAutoScrollSpeed(amount) {
+            this.comicViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.comicViewer.autoScrollSpeed + amount));
+        },
+        openEpubViewer(file, isShare = false, shareToken = '') {
+            this._transitioningChapter = false;
+            this.epubViewer.show = true;
+            this.epubViewer.file = file;
+            this.epubViewer.loading = true;
+            this.epubViewer.toc = [];
+            this.epubViewer.sidebarOpen = false;
+            this.epubViewer.fontSize = 100;
+            this.epubViewer.pageProgress = 0;
+            this.epubViewer.spine = [];
+            this.epubViewer.currentChapter = 0;
+            this.epubViewer.title = '';
+            this.epubViewer.settingsOpen = false;
+            
+            const token = this.shareToken || this.token || shareToken || '';
+            const hasShareToken = !!token;
+            
+            const metaUrl = hasShareToken
+                ? (file.id ? `/s/${token}/file/${file.id}/epub/meta` : `/s/${token}/epub/meta`)
+                : `/api/files/${file.id}/epub/meta`;
+            
+            const resourceBaseUrl = hasShareToken
+                ? (file.id ? `/s/${token}/file/${file.id}/epub/resource` : `/s/${token}/epub/resource`)
+                : `/api/files/${file.id}/epub/resource`;
+            
+            this.epubViewer.resourceBaseUrl = resourceBaseUrl;
+
+            // Clean up previous
+            if (window._epubBook) {
+                try { window._epubBook.destroy(); } catch(e) {}
+                window._epubBook = null;
+                window._epubRendition = null;
+            }
+
+            this.$nextTick(() => {
+                const area = document.getElementById('epub-viewer-area');
+                if (area) area.innerHTML = '<iframe id="epub-iframe" class="w-full h-full border-0" sandbox="allow-same-origin" style="background:#fff"></iframe>';
+                
+                (async () => {
+                    try {
+                        const res = await fetch(metaUrl, { credentials: 'same-origin' });
+                        if (!res.ok) throw new Error('meta_fetch_failed');
+                        const meta = await res.json();
+                        
+                        if (!this.epubViewer.show || !this.epubViewer.file || String(this.epubViewer.file.id) !== String(file.id) || this.epubViewer.file.filename !== file.filename) return;
+                        
+                        // Flatten TOC recursively and add indent levels + unique ids
+                        const flattenToc = (items, level = 0) => {
+                            let result = [];
+                            items.forEach((item, idx) => {
+                                result.push({
+                                    id: `toc-${level}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
+                                    label: item.label,
+                                    href: item.href,
+                                    level: level
+                                });
+                                if (item.children && item.children.length > 0) {
+                                    result = result.concat(flattenToc(item.children, level + 1));
+                                }
+                            });
+                            return result;
+                        };
+                        this.epubViewer.toc = flattenToc(meta.toc || []);
+                        this.epubViewer.spine = meta.spine || [];
+                        this.epubViewer.title = meta.title || file.filename;
+                        
+                        // Restore reading position
+                        const savedChapter = file.id ? parseInt(localStorage.getItem(`epub-ch-${file.id}`) || '0') : 0;
+                        this.epubViewer.currentChapter = Math.max(0, Math.min(savedChapter, this.epubViewer.spine.length - 1));
+                        
+                        this._loadEpubChapter(file);
+                    } catch (err) {
+                        console.error('EPUB meta failed:', err);
+                        if (this.epubViewer.file && String(this.epubViewer.file.id) === String(file.id) && this.epubViewer.file.filename === file.filename) {
+                            this.showToast(this.t('err_loading_epub'), 'error');
+                            this.epubViewer.show = false;
+                            this.epubViewer.loading = false;
+                        }
+                    }
+                })();
+            });
+        },
+        _normalizePath(p) {
+            if (!p) return '';
+            try { p = decodeURIComponent(p); } catch(e) {}
+            p = p.replace(/\\/g, '/'); // normalize backslashes
+            if (p.startsWith('./')) p = p.substring(2);
+            p = p.replace(/\/+/g, '/');
+            return p.trim();
+        },
+        _resolveRelativePath(base, relative) {
+            if (relative.startsWith('/')) return relative.substring(1);
+            if (relative.includes('://')) return relative;
+            
+            const baseParts = base.split('/');
+            baseParts.pop(); // remove filename
+            
+            const relParts = relative.split('/');
+            for (const part of relParts) {
+                if (part === '.' || part === '') {
+                    continue;
+                } else if (part === '..') {
+                    if (baseParts.length > 0) baseParts.pop();
+                } else {
+                    baseParts.push(part);
+                }
+            }
+            return baseParts.join('/');
+        },
+        _loadEpubChapter(file, startAtBottom = false) {
+            const chapter = this.epubViewer.spine[this.epubViewer.currentChapter];
+            if (!chapter) return;
+            
+            this.epubViewer.loading = true;
+            const iframe = document.getElementById('epub-iframe');
+            if (!iframe) return;
+            
+            iframe.onload = () => {
+                if (!this.epubViewer.show || !this.epubViewer.file || String(this.epubViewer.file.id) !== String(file.id) || this.epubViewer.file.filename !== file.filename) return;
+                this.epubViewer.loading = false;
+                this._transitioningChapter = false;
+                this.applyEpubTheme();
+                
+                const win = iframe.contentWindow;
+                const doc = iframe.contentDocument;
+                
+                // Intercept links inside the iframe
+                doc.querySelectorAll('a').forEach(a => {
+                    a.addEventListener('click', (e) => {
+                        const href = a.getAttribute('href');
+                        if (!href) return;
+                        
+                        if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+                            e.preventDefault();
+                            window.open(href, '_blank');
+                            return;
+                        }
+                        
+                        e.preventDefault();
+                        const currentChapter = this.epubViewer.spine[this.epubViewer.currentChapter];
+                        if (currentChapter) {
+                            const resolvedHref = this._resolveRelativePath(currentChapter.href, href);
+                            this.navigateToCfi(resolvedHref);
+                        }
+                    });
+                });
+
+                // Restore/set scroll position
+                if (startAtBottom) {
+                    try { win.scrollTo(0, doc.documentElement.scrollHeight || doc.body.scrollHeight || 999999); } catch(e) {}
+                } else {
+                    const savedScroll = file.id ? localStorage.getItem(`epub-scroll-${file.id}`) : null;
+                    if (savedScroll) {
+                        try { win.scrollTo(0, parseInt(savedScroll)); } catch(e) {}
+                        localStorage.removeItem(`epub-scroll-${file.id}`);
+                    } else {
+                        win.scrollTo(0, 0);
+                    }
+                }
+                
+                // Add scroll listener inside the iframe to save progress and auto-navigate chapters
+                let lastScrollTime = 0;
+                let lastScrollTop = win.scrollY || doc.documentElement.scrollTop || 0;
+                
+                win.addEventListener('scroll', () => {
+                    const scrollTop = win.scrollY || doc.documentElement.scrollTop || 0;
+                    const scrollHeight = doc.documentElement.scrollHeight || doc.body.scrollHeight || 0;
+                    const clientHeight = doc.documentElement.clientHeight || win.innerHeight || 0;
+                    
+                    const isScrollingUp = scrollTop < lastScrollTop;
+                    lastScrollTop = scrollTop;
+                    
+                    // Throttle progress saving
+                    const now = Date.now();
+                    if (now - lastScrollTime > 1000) {
+                        this._saveEpubScroll();
+                        lastScrollTime = now;
+                    }
+                });
+
+
+            };
+            
+            iframe.src = `${this.epubViewer.resourceBaseUrl}/${chapter.href}`;
+            
+            // Save reading position
+            if (file.id) {
+                try { localStorage.setItem(`epub-ch-${file.id}`, this.epubViewer.currentChapter); } catch(e) {}
+            }
+            
+            // Update progress
+            if (this.epubViewer.spine.length > 0) {
+                this.epubViewer.pageProgress = Math.round(((this.epubViewer.currentChapter + 1) / this.epubViewer.spine.length) * 100);
+            }
+        },
+        nextEpubChapter() {
+            if (this.epubViewer.currentChapter < this.epubViewer.spine.length - 1) {
+                this._saveEpubScroll();
+                this.epubViewer.currentChapter++;
+                this._loadEpubChapter(this.epubViewer.file, false);
+            }
+        },
+        prevEpubChapter(startAtBottom = false) {
+            if (this.epubViewer.currentChapter > 0) {
+                this._saveEpubScroll();
+                this.epubViewer.currentChapter--;
+                this._loadEpubChapter(this.epubViewer.file, startAtBottom);
+            }
+        },
+        _saveEpubScroll() {
+            const iframe = document.getElementById('epub-iframe');
+            if (iframe && iframe.contentWindow && this.epubViewer.file && this.epubViewer.file.id) {
+                try { localStorage.setItem(`epub-scroll-${this.epubViewer.file.id}`, iframe.contentWindow.scrollY || iframe.contentDocument.documentElement.scrollTop || 0); } catch(e) {}
+            }
+        },
+        navigateToCfi(href) {
+            const fullHref = typeof href === 'string' ? href : (href && href.href ? href.href : '');
+            const parts = fullHref.split('#');
+            const rawBaseHref = parts[0];
+            const fragment = parts[1] || '';
+            
+            const baseHref = this._normalizePath(rawBaseHref);
+            
+            const idx = this.epubViewer.spine.findIndex(s => {
+                const spineHref = this._normalizePath(s.href);
+                return spineHref === baseHref || spineHref.endsWith('/' + baseHref) || baseHref.endsWith('/' + spineHref);
+            });
+            
+            if (idx >= 0) {
+                this.epubViewer.currentChapter = idx;
+                this._loadEpubChapter(this.epubViewer.file, false);
+                if (fragment) {
+                    setTimeout(() => {
+                        const iframe = document.getElementById('epub-iframe');
+                        if (iframe && iframe.contentDocument) {
+                            let el = iframe.contentDocument.getElementById(fragment);
+                            if (!el) {
+                                const els = iframe.contentDocument.getElementsByName(fragment);
+                                if (els && els.length > 0) el = els[0];
+                            }
+                            if (el) el.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }, 500);
+                }
+            }
+            this.epubViewer.sidebarOpen = false;
+        },
+        applyEpubTheme() {
+            const iframe = document.getElementById('epub-iframe');
+            if (!iframe || !iframe.contentDocument) return;
+            
+            const doc = iframe.contentDocument;
+            const win = iframe.contentWindow;
+            const isDark = document.documentElement.classList.contains('dark');
+            const bg = isDark ? '#1e293b' : '#ffffff';
+            const fg = isDark ? '#f1f5f9' : '#0f172a';
+            
+            let style = doc.getElementById('tc-epub-theme');
+            if (!style) {
+                style = doc.createElement('style');
+                style.id = 'tc-epub-theme';
+                doc.head.appendChild(style);
+            }
+            style.textContent = `
+                body { background: ${bg} !important; color: ${fg} !important; font-size: ${this.epubViewer.fontSize}% !important; line-height: 1.6 !important; padding: 20px !important; max-width: 800px !important; margin: 0 auto !important; font-family: Inter, system-ui, -apple-system, sans-serif !important; }
+                p, span, div, li, td, th, h1, h2, h3, h4, h5, h6 { color: ${fg} !important; }
+                a { color: #3b82f6 !important; }
+                img, svg { max-width: 100% !important; height: auto !important; }
+                
+                /* Custom slim scrollbar inside iframe */
+                ::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+                ::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                ::-webkit-scrollbar-thumb {
+                    background: ${isDark ? '#475569' : '#cbd5e1'};
+                    border-radius: 4px;
+                }
+                ::-webkit-scrollbar-thumb:hover {
+                    background: ${isDark ? '#64748b' : '#94a3b8'};
+                }
+            `;
+        },
+        changeEpubFontSize(delta) {
+            this.epubViewer.fontSize = Math.max(50, Math.min(250, this.epubViewer.fontSize + delta));
+            this.applyEpubTheme();
+        },
+        nextEpubPage() { this.nextEpubChapter(); },
+        prevEpubPage() { this.prevEpubChapter(); },
+        closeEpubViewer() {
+            // 1. Kill rAF immediately without triggering Alpine reactivity
+            if (window._epubAutoScrollRaf) {
+                cancelAnimationFrame(window._epubAutoScrollRaf);
+                window._epubAutoScrollRaf = null;
+            }
+            // 2. Cancel any pending chapter transition timeouts
+            this._transitioningChapter = false;
+            // 3. Save scroll position while iframe is still alive
+            try { this._saveEpubScroll(); } catch(e) {}
+            // 4. Hide immediately to trigger the Alpine.js leaving transition
+            this.epubViewer.show = false;
+            this.epubViewer.autoScrollActive = false;
+            // 5. Defer nuke and state reset to let transition complete cleanly
+            setTimeout(() => {
+                const iframe = document.getElementById('epub-iframe');
+                if (iframe) { iframe.onload = null; iframe.src = 'about:blank'; }
+                if (window._epubBook) {
+                    try { window._epubBook.destroy(); } catch(e) {}
+                    window._epubBook = null;
+                    window._epubRendition = null;
+                }
+                const area = document.getElementById('epub-viewer-area');
+                if (area) area.innerHTML = '';
+                this.epubViewer.file = null;
+                this.epubViewer.toc = [];
+                this.epubViewer.spine = [];
+                this.epubViewer.settingsOpen = false;
+            }, 400);
+        },
+        toggleEpubAutoScroll() {
+            this.epubViewer.autoScrollActive = !this.epubViewer.autoScrollActive;
+            if (this.epubViewer.autoScrollActive) {
+                this.startEpubAutoScroll();
+            } else {
+                this.stopEpubAutoScroll();
+            }
+        },
+        startEpubAutoScroll() {
+            if (window._epubAutoScrollRaf) cancelAnimationFrame(window._epubAutoScrollRaf);
+            const scrollLoop = () => {
+                if (!this.epubViewer.show || !this.epubViewer.autoScrollActive) {
+                    this.epubViewer.autoScrollActive = false;
+                    if (window._epubAutoScrollRaf) {
+                        cancelAnimationFrame(window._epubAutoScrollRaf);
+                        window._epubAutoScrollRaf = null;
+                    }
+                    return;
+                }
+                // Skip scrolling while chapter is transitioning to avoid accessing a reloading iframe
+                if (this._transitioningChapter) {
+                    window._epubAutoScrollRaf = requestAnimationFrame(scrollLoop);
+                    return;
+                }
+                try {
+                    const iframe = document.getElementById('epub-iframe');
+                    if (iframe && iframe.contentWindow && iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+                        iframe.contentWindow.scrollBy(0, Math.pow(this.epubViewer.autoScrollSpeed, 2) * 0.25);
+                    } else if (!iframe) {
+                        this.stopEpubAutoScroll();
+                        return;
+                    }
+                    // If iframe exists but not ready, just skip this frame
+                } catch (e) {
+                    // Silently skip - iframe may be reloading during chapter transition
+                    if (!this.epubViewer.show) {
+                        this.stopEpubAutoScroll();
+                        return;
+                    }
+                }
+                window._epubAutoScrollRaf = requestAnimationFrame(scrollLoop);
+            };
+            window._epubAutoScrollRaf = requestAnimationFrame(scrollLoop);
+        },
+        stopEpubAutoScroll() {
+            this.epubViewer.autoScrollActive = false;
+            if (window._epubAutoScrollRaf) {
+                cancelAnimationFrame(window._epubAutoScrollRaf);
+                window._epubAutoScrollRaf = null;
+            }
+        },
+        changeEpubAutoScrollSpeed(amount) {
+            this.epubViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.epubViewer.autoScrollSpeed + amount));
+        },
+        openPdfViewer(file, isShare = false, shareToken = '') {
+            this.pdfViewer.show = true;
+            this.pdfViewer.file = file;
+            this.pdfViewer.loading = true;
+            this.pdfViewer.pageLoading = true;
+            this.pdfViewer.sidebarOpen = false;
+            this.pdfViewer.zoom = 'width';
+            this.pdfViewer.pageProgress = 0;
+            this.pdfViewer.currentPage = 1;
+            this.pdfViewer.numPages = 0;
+            this.pdfViewer.settingsOpen = false;
+            this.pdfViewer.toc = [];
+            this.pdfViewer.autoScrollActive = false;
+            this.pdfViewer.autoScrollSpeed = 2;
+            
+            const isDarkGlobal = document.documentElement.classList.contains('dark');
+            this.pdfViewer.darkModeFilter = isDarkGlobal;
+
+            const token = this.shareToken || this.token || shareToken || '';
+            const hasShareToken = !!token;
+            
+            let downloadUrl;
+            if (hasShareToken) {
+                if (file && file.id) {
+                    downloadUrl = `/s/${token}/file/${file.id}/stream`;
+                } else {
+                    downloadUrl = `/s/${token}/stream`;
+                }
+            } else {
+                downloadUrl = `/download/${file.id}`;
+            }
+
+            if (window._pdfLoadingTask) {
+                try { window._pdfLoadingTask.destroy(); } catch(e) {}
+                window._pdfLoadingTask = null;
+            }
+            if (window._pdfRenderTask) {
+                try { window._pdfRenderTask.cancel(); } catch(e) {}
+                window._pdfRenderTask = null;
+            }
+            window._pdfDoc = null;
+
+            if (window._pdfResizeHandler) {
+                window.removeEventListener('resize', window._pdfResizeHandler);
+            }
+            window._pdfResizeHandler = () => {
+                if (this.pdfViewer.show && (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height')) {
+                    if (window._pdfResizeTimeout) clearTimeout(window._pdfResizeTimeout);
+                    window._pdfResizeTimeout = setTimeout(() => {
+                        if (this.pdfViewer.scrollMode === 'continuous') {
+                            const container = document.getElementById('pdf-continuous-container') || 
+                                              document.getElementById('share-pdf-continuous-container') || 
+                                              document.getElementById('share-folder-pdf-continuous-container');
+                            if (container) {
+                                const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                                const containerRect = container.getBoundingClientRect();
+                                wrappers.forEach(wrapper => {
+                                    const canvas = wrapper.querySelector('canvas');
+                                    if (canvas) canvas.removeAttribute('data-rendered');
+                                    const rect = wrapper.getBoundingClientRect();
+                                    if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                                        const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                                        this.renderPdfContinuousPage(pageNum);
+                                    }
+                                });
+                            }
+                        } else {
+                            this.renderPdfPage(this.pdfViewer.currentPage);
+                        }
+                    }, 150);
+                }
+            };
+            window.addEventListener('resize', window._pdfResizeHandler);
+
+            this.$nextTick(async () => {
+                try {
+                    const loadingTask = pdfjsLib.getDocument({ url: downloadUrl, withCredentials: true });
+                    window._pdfLoadingTask = loadingTask;
+                    
+                    const pdfDoc = await loadingTask.promise;
+                    if (!this.pdfViewer.show || !this.pdfViewer.file || String(this.pdfViewer.file.id || '') !== String(file.id || '') || this.pdfViewer.file.filename !== file.filename) {
+                        return;
+                    }
+                    
+                    window._pdfDoc = pdfDoc;
+                    this.pdfViewer.numPages = pdfDoc.numPages;
+                    this.pdfViewer.loading = false;
+
+                    try {
+                        const outline = await pdfDoc.getOutline();
+                        if (outline && outline.length > 0) {
+                            const resolveOutline = async (items) => {
+                                const result = [];
+                                for (const item of items) {
+                                    let pageNumber = null;
+                                    if (item.dest) {
+                                        try {
+                                            let dest = item.dest;
+                                            if (typeof dest === 'string') {
+                                                dest = await pdfDoc.getDestination(dest);
+                                            }
+                                            if (dest && Array.isArray(dest)) {
+                                                const pageRef = dest[0];
+                                                const pageIndex = await pdfDoc.getPageIndex(pageRef);
+                                                pageNumber = pageIndex + 1;
+                                            }
+                                        } catch (e) {
+                                            console.error("Outline dest resolution error:", e);
+                                        }
+                                    }
+                                    const node = { title: item.title, page: pageNumber };
+                                    if (item.items && item.items.length > 0) {
+                                        node.children = await resolveOutline(item.items);
+                                    }
+                                    result.push(node);
+                                }
+                                return result;
+                            };
+                            const resolved = await resolveOutline(outline);
+                            const flatten = (nodes, depth = 0) => {
+                                let list = [];
+                                nodes.forEach(n => {
+                                    list.push({ title: n.title, page: n.page, depth });
+                                    if (n.children) {
+                                        list = list.concat(flatten(n.children, depth + 1));
+                                    }
+                                });
+                                return list;
+                            };
+                            this.pdfViewer.toc = flatten(resolved);
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse outline:", e);
+                    }
+
+                    let startPage = 1;
+                    if (file && file.id) {
+                        const saved = localStorage.getItem(`pdf-page-${file.id}`);
+                        if (saved) {
+                            const p = parseInt(saved);
+                            if (p >= 1 && p <= pdfDoc.numPages) {
+                                startPage = p;
+                            }
+                        }
+                        const savedMode = localStorage.getItem(`pdf-scroll-mode-${file.id}`);
+                        if (savedMode) {
+                            this.pdfViewer.scrollMode = savedMode;
+                        } else {
+                            this.pdfViewer.scrollMode = 'page';
+                        }
+                    } else {
+                        this.pdfViewer.scrollMode = 'page';
+                    }
+                    this.pdfViewer.currentPage = startPage;
+                    this.pdfViewer.pageProgress = Math.round((startPage / pdfDoc.numPages) * 100);
+                    if (this.pdfViewer.scrollMode === 'continuous') {
+                        this.$nextTick(() => {
+                            setTimeout(() => {
+                                const container = document.getElementById('pdf-continuous-container') || 
+                                                  document.getElementById('share-pdf-continuous-container') || 
+                                                  document.getElementById('share-folder-pdf-continuous-container');
+                                if (container) {
+                                    const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${startPage}"]`);
+                                    if (wrapper) {
+                                        wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                                    }
+                                }
+                            }, 300);
+                        });
+                    } else {
+                        this.renderPdfPage(startPage);
+                    }
+
+                } catch (err) {
+                    console.error("PDF.js initialization failed:", err);
+                    this.showToast(this.t('err_loading_pdf'), 'error');
+                    this.pdfViewer.show = false;
+                    this.pdfViewer.loading = false;
+                    this.pdfViewer.pageLoading = false;
+                }
+            });
+        },
+        renderPdfPage(pageNumber) {
+            if (!window._pdfDoc) return;
+            if (pageNumber < 1 || pageNumber > this.pdfViewer.numPages) return;
+            
+            this.pdfViewer.pageLoading = true;
+            this.pdfViewer.currentPage = pageNumber;
+            
+            if (this.pdfViewer.file && this.pdfViewer.file.id) {
+                try { localStorage.setItem(`pdf-page-${this.pdfViewer.file.id}`, pageNumber); } catch(e) {}
+            }
+            
+            this.pdfViewer.pageProgress = Math.round((pageNumber / this.pdfViewer.numPages) * 100);
+            
+            if (window._pdfRenderTask) {
+                try { window._pdfRenderTask.cancel(); } catch(e) {}
+                window._pdfRenderTask = null;
+            }
+            
+            window._pdfDoc.getPage(pageNumber).then(page => {
+                const canvas = document.getElementById('pdf-canvas');
+                if (!canvas) {
+                    this.pdfViewer.pageLoading = false;
+                    return;
+                }
+                
+                const context = canvas.getContext('2d');
+                const container = document.getElementById('pdf-viewer-area');
+                if (!container) {
+                    this.pdfViewer.pageLoading = false;
+                    return;
+                }
+                
+                let scale = 1.0;
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                
+                if (this.pdfViewer.zoom === 'width') {
+                    scale = (container.clientWidth - 32) / unscaledViewport.width;
+                } else if (this.pdfViewer.zoom === 'height') {
+                    scale = (container.clientHeight - 32) / unscaledViewport.height;
+                } else {
+                    scale = (parseInt(this.pdfViewer.zoom) || 100) / 100;
+                }
+                
+                const outputScale = window.devicePixelRatio || 1;
+                const viewport = page.getViewport({ scale: scale });
+                
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + "px";
+                canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                const transform = outputScale !== 1
+                    ? [outputScale, 0, 0, outputScale, 0, 0]
+                    : null;
+                
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport,
+                    transform: transform
+                };
+                
+                const renderTask = page.render(renderContext);
+                window._pdfRenderTask = renderTask;
+                
+                renderTask.promise.then(() => {
+                    this.pdfViewer.pageLoading = false;
+                    window._pdfRenderTask = null;
+                }).catch(err => {
+                    if (err.name === 'RenderingCancelledException') return;
+                    console.error("PDF page rendering error:", err);
+                    this.pdfViewer.pageLoading = false;
+                });
+            }).catch(err => {
+                console.error("Failed to render PDF page:", err);
+                this.pdfViewer.pageLoading = false;
+            });
+        },
+        pdfZoomIn() {
+            if (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height') {
+                this.pdfViewer.zoom = 100;
+            } else {
+                this.pdfViewer.zoom = Math.min(300, this.pdfViewer.zoom + 25);
+            }
+            if (this.pdfViewer.scrollMode === 'continuous') {
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (container) {
+                    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                    const containerRect = container.getBoundingClientRect();
+                    wrappers.forEach(wrapper => {
+                        const canvas = wrapper.querySelector('canvas');
+                        if (canvas) canvas.removeAttribute('data-rendered');
+                        const rect = wrapper.getBoundingClientRect();
+                        if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                            const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                            this.renderPdfContinuousPage(pageNum);
+                        }
+                    });
+                }
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        pdfZoomOut() {
+            if (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height') {
+                this.pdfViewer.zoom = 100;
+            } else {
+                this.pdfViewer.zoom = Math.max(50, this.pdfViewer.zoom - 25);
+            }
+            if (this.pdfViewer.scrollMode === 'continuous') {
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (container) {
+                    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                    const containerRect = container.getBoundingClientRect();
+                    wrappers.forEach(wrapper => {
+                        const canvas = wrapper.querySelector('canvas');
+                        if (canvas) canvas.removeAttribute('data-rendered');
+                        const rect = wrapper.getBoundingClientRect();
+                        if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                            const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                            this.renderPdfContinuousPage(pageNum);
+                        }
+                    });
+                }
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        pdfSetZoom(val) {
+            this.pdfViewer.zoom = val;
+            if (this.pdfViewer.scrollMode === 'continuous') {
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (container) {
+                    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                    const containerRect = container.getBoundingClientRect();
+                    wrappers.forEach(wrapper => {
+                        const canvas = wrapper.querySelector('canvas');
+                        if (canvas) canvas.removeAttribute('data-rendered');
+                        const rect = wrapper.getBoundingClientRect();
+                        if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                            const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                            this.renderPdfContinuousPage(pageNum);
+                        }
+                    });
+                }
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        pdfNextPage() {
+            if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
+                this.renderPdfPage(this.pdfViewer.currentPage + 1);
+                this.$nextTick(() => {
+                    const area = document.getElementById('pdf-viewer-area');
+                    if (area) area.scrollTop = 0;
+                });
+            }
+        },
+        pdfPrevPage() {
+            if (this.pdfViewer.currentPage > 1) {
+                this.renderPdfPage(this.pdfViewer.currentPage - 1);
+                this.$nextTick(() => {
+                    const area = document.getElementById('pdf-viewer-area');
+                    if (area) area.scrollTop = 0;
+                });
+            }
+        },
+        pdfJumpToPage(page) {
+            const p = parseInt(page);
+            if (p >= 1 && p <= this.pdfViewer.numPages) {
+                this.renderPdfPage(p);
+                this.$nextTick(() => {
+                    const area = document.getElementById('pdf-viewer-area');
+                    if (area) area.scrollTop = 0;
+                });
+            }
+        },
+        closePdfViewer() {
+            if (window._pdfIntersectionObserver) {
+                window._pdfIntersectionObserver.disconnect();
+                window._pdfIntersectionObserver = null;
+            }
+            if (window._pdfAutoScrollRaf) {
+                cancelAnimationFrame(window._pdfAutoScrollRaf);
+                window._pdfAutoScrollRaf = null;
+            }
+            this.pdfViewer.show = false;
+            this.pdfViewer.autoScrollActive = false;
+            
+            if (window._pdfResizeHandler) {
+                window.removeEventListener('resize', window._pdfResizeHandler);
+                window._pdfResizeHandler = null;
+            }
+            setTimeout(() => {
+                if (window._pdfLoadingTask) {
+                    try { window._pdfLoadingTask.destroy(); } catch(e) {}
+                    window._pdfLoadingTask = null;
+                }
+                if (window._pdfRenderTask) {
+                    try { window._pdfRenderTask.cancel(); } catch(e) {}
+                    window._pdfRenderTask = null;
+                }
+                window._pdfDoc = null;
+                const canvas = document.getElementById('pdf-canvas');
+                if (canvas) {
+                    const context = canvas.getContext('2d');
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                }
+                this.pdfViewer.file = null;
+                this.pdfViewer.toc = [];
+                this.pdfViewer.settingsOpen = false;
+            }, 400);
+        },
+        togglePdfAutoScroll() {
+            this.pdfViewer.autoScrollActive = !this.pdfViewer.autoScrollActive;
+            if (this.pdfViewer.autoScrollActive) {
+                this.startPdfAutoScroll();
+            } else {
+                this.stopPdfAutoScroll();
+            }
+        },
+        startPdfAutoScroll() {
+            if (window._pdfAutoScrollRaf) cancelAnimationFrame(window._pdfAutoScrollRaf);
+            const scrollLoop = () => {
+                if (!this.pdfViewer.show || !this.pdfViewer.autoScrollActive) {
+                    this.pdfViewer.autoScrollActive = false;
+                    if (window._pdfAutoScrollRaf) {
+                        cancelAnimationFrame(window._pdfAutoScrollRaf);
+                        window._pdfAutoScrollRaf = null;
+                    }
+                    return;
+                }
+                try {
+                    const container = document.getElementById('pdf-viewer-area');
+                    if (container) {
+                        container.scrollBy(0, Math.pow(this.pdfViewer.autoScrollSpeed, 2) * 0.25);
+                        if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
+                            if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
+                                this.pdfNextPage();
+                                container.scrollTop = 0;
+                            } else {
+                                this.stopPdfAutoScroll();
+                                return;
+                            }
+                        }
+                    } else {
+                        this.stopPdfAutoScroll();
+                        return;
+                    }
+                } catch (e) {
+                    if (!this.pdfViewer.show) {
+                        this.stopPdfAutoScroll();
+                        return;
+                    }
+                }
+                window._pdfAutoScrollRaf = requestAnimationFrame(scrollLoop);
+            };
+            window._pdfAutoScrollRaf = requestAnimationFrame(scrollLoop);
+        },
+        stopPdfAutoScroll() {
+            this.pdfViewer.autoScrollActive = false;
+            if (window._pdfAutoScrollRaf) {
+                cancelAnimationFrame(window._pdfAutoScrollRaf);
+                window._pdfAutoScrollRaf = null;
+            }
+        },
+        changePdfAutoScrollSpeed(amount) {
+            this.pdfViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.pdfViewer.autoScrollSpeed + amount));
+        },
+        renderPdfContinuousPage(pageNum) {
+            if (!window._pdfDoc) return;
+            const canvas = document.getElementById(`pdf-canvas-${pageNum}`);
+            if (!canvas || canvas.getAttribute('data-rendered') === 'true') return;
+            
+            window._pdfDoc.getPage(pageNum).then(page => {
+                const context = canvas.getContext('2d');
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (!container) return;
+                
+                let scale = 1.0;
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                
+                if (this.pdfViewer.zoom === 'width') {
+                    scale = (container.clientWidth - 32) / unscaledViewport.width;
+                } else if (this.pdfViewer.zoom === 'height') {
+                    scale = (container.clientHeight - 32) / unscaledViewport.height;
+                } else {
+                    scale = (parseInt(this.pdfViewer.zoom) || 100) / 100;
+                }
+                
+                const outputScale = window.devicePixelRatio || 1;
+                const viewport = page.getViewport({ scale: scale });
+                
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + "px";
+                canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport,
+                    transform: transform
+                };
+                
+                page.render(renderContext).promise.then(() => {
+                    canvas.setAttribute('data-rendered', 'true');
+                });
+            });
+        },
+        trackPdfContinuousScroll(container) {
+            if (this.pdfViewer.scrollMode !== 'continuous') return;
+            const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+            let activePage = 1;
+            let minDiff = Infinity;
+            const containerTop = container.getBoundingClientRect().top;
+            wrappers.forEach((wrapper) => {
+                const rect = wrapper.getBoundingClientRect();
+                const diff = Math.abs(rect.top - containerTop);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    activePage = parseInt(wrapper.getAttribute('data-page'), 10);
+                }
+            });
+            if (activePage !== this.pdfViewer.currentPage) {
+                this.pdfViewer.currentPage = activePage;
+                this.pdfViewer.pageProgress = Math.round((activePage / this.pdfViewer.numPages) * 100);
+                if (this.pdfViewer.file && this.pdfViewer.file.id) {
+                    try { localStorage.setItem(`pdf-page-${this.pdfViewer.file.id}`, activePage); } catch(e) {}
+                }
+            }
+        },
+        togglePdfScrollMode() {
+            const nextMode = this.pdfViewer.scrollMode === 'page' ? 'continuous' : 'page';
+            this.pdfViewer.scrollMode = nextMode;
+            if (this.pdfViewer.file && this.pdfViewer.file.id) {
+                try { localStorage.setItem(`pdf-scroll-mode-${this.pdfViewer.file.id}`, nextMode); } catch(e) {}
+            }
+            if (nextMode === 'continuous') {
+                this.$nextTick(() => {
+                    setTimeout(() => {
+                        const container = document.getElementById('pdf-continuous-container') || 
+                                          document.getElementById('share-pdf-continuous-container') || 
+                                          document.getElementById('share-folder-pdf-continuous-container');
+                        if (container) {
+                            const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${this.pdfViewer.currentPage}"]`);
+                            if (wrapper) {
+                                wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                            }
+                        }
+                    }, 100);
+                });
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
         async showFileInfo(file) {
             if (file.is_folder) return;
             const typeData = this.getFileTypeData(file.filename);
@@ -2408,6 +4118,10 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'ogv', '3gp', 'flv', 'wmv'];
             const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus', 'oga', 'aac', 'm4b'];
             const textExts = ['txt', 'md', 'log', 'json', 'js', 'py', 'go', 'html', 'css', 'yml', 'yaml', 'sql', 'sh', 'conf', 'ini', 'c', 'cpp', 'h', 'hpp', 'cs', 'java', 'rb', 'rs', 'swift'];
+            const isComicOrEpubOrPdf = (typeData.n === 'type_comic' || typeData.n === 'type_epub' || typeData.n === 'type_pdf');
+            const isTooLarge = (imgExts.includes(ext) && file.size > 50 * 1024 * 1024) || 
+                               (isComicOrEpubOrPdf && file.size > 150 * 1024 * 1024) || 
+                               (textExts.includes(ext) && file.size > 10 * 1024 * 1024);
             
             const langMap = {
                 'js': 'javascript', 'json': 'json', 'py': 'python', 'go': 'go', 
@@ -2432,22 +4146,22 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             if (mediaHtml) {
                 isMedia = true;
                 isLarge = true; // Make media modals larger by default
-                if (imgExts.includes(ext) && file.size > 50 * 1024 * 1024) this.fileInfoModal.tooLarge = true;
-                if (videoExts.includes(ext) || audioExts.includes(ext)) {
+                if ((videoExts.includes(ext) || audioExts.includes(ext)) && !(TeleCloud.isAppleDevice() && ext === 'mkv')) {
                     playerTarget = { el: '#index-tele-player', type: videoExts.includes(ext) ? 'video' : 'audio' };
                 }
             } else if (textExts.includes(ext)) {
-                this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: false, mediaHtml: '', isLarge: true, isPreviewLoading: false, needsLoad: false, tooLarge: false };
+                this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: false, mediaHtml: '', isLarge: true, isPreviewLoading: false, needsLoad: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: false };
                 
-                if (file.size > 50 * 1024 * 1024) {
-                    this.fileInfoModal.tooLarge = true;
+                if (isTooLarge) {
+                    // Handled by tooLarge property
                 } else {
                     this.fileInfoModal.needsLoad = true;
                 }
                 return;
             }
             
-            this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: isMedia, mediaHtml: mediaHtml, isLarge: isLarge, isPreviewLoading: false };
+            const isUnsupportedMkv = (TeleCloud.isAppleDevice() && ext === 'mkv');
+            this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: isMedia, mediaHtml: mediaHtml, isLarge: isLarge, isPreviewLoading: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: isUnsupportedMkv };
             if (playerTarget) {
                 setTimeout(() => {
                     if (this.playerInstance) this.playerInstance.destroy();
@@ -2457,9 +4171,12 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                         const plyrOpts = { controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'settings'], settings: ['speed'], speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] } };
                         this.playerInstance = new Plyr(playerTarget.el, plyrOpts);
                     } else {
+                        const matchedSubs = findSubtitlesForVideo(file.filename, this.files || [], false, '');
                         this.playerInstance = new Artplayer({
                             logger: false,
                             container: playerTarget.el,
+                            lang: this.lang === 'vi' ? 'vi' : 'en',
+                            i18n: artplayerI18n,
                             url: streamUrl,
                             poster: thumbUrl,
                             title: file.filename,
@@ -2483,6 +4200,19 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                                 'webkit-playsinline': true,
                                 'x5-video-player-type': 'h5-page',
                             },
+                            subtitle: {
+                                url: matchedSubs.length > 0 ? matchedSubs[0].url : '',
+                                type: matchedSubs.length > 0 ? matchedSubs[0].type : 'vtt',
+                                style: {
+                                    color: '#ffffff',
+                                    fontSize: '20px',
+                                    textShadow: '0 0 4px #000, 0 0 4px #000',
+                                },
+                                escape: false,
+                            },
+                            settings: [
+                                buildArtplayerSubtitleSetting(file.filename, this.files || [], false, '', (k) => this.t(k))
+                            ],
                             icons: {
                                 loading: '<i class="fa-solid fa-spinner fa-spin text-4xl"></i>',
                                 state: '<i class="fa-solid fa-play text-4xl"></i>',
@@ -3032,11 +4762,20 @@ function shareApp() {
         plyrInstance: null,
         imageViewer: { show: false, src: '', filename: '' },
         lightboxLoading: false,
-        fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false },
+        comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false },
+        epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
         
         init() { 
             this.shareToken = this.$refs.token ? this.$refs.token.textContent.trim() : '';
+            window.addEventListener('tc-render-pdf-page', (e) => {
+                if (this.pdfViewer && this.pdfViewer.show && this.pdfViewer.scrollMode === 'continuous') {
+                    this.renderPdfContinuousPage(e.detail.pageNum);
+                }
+            });
+
             window.addEventListener('tc-translations-loaded', (e) => {
                 this.lang = '';
                 this.$nextTick(() => { this.lang = e.detail.lang; });
@@ -3084,8 +4823,16 @@ function shareApp() {
         
         closeFileInfoModal() {
             this.fileInfoModal.show = false;
+            if (this.playerInstance) {
+                try {
+                    this.playerInstance.destroy();
+                } catch(e) {
+                    console.error("Error destroying player:", e);
+                }
+                this.playerInstance = null;
+            }
             if (this.plyrInstance) { this.plyrInstance.destroy(); this.plyrInstance = null; }
-            setTimeout(() => { if (!this.fileInfoModal.show) { this.fileInfoModal.isMedia = false; this.fileInfoModal.mediaHtml = ''; this.fileInfoModal.isLarge = false; this.fileInfoModal.isPreviewLoading = false; this.fileInfoModal.needsLoad = false; this.fileInfoModal.tooLarge = false; } }, 300);
+            setTimeout(() => { if (!this.fileInfoModal.show) { this.fileInfoModal.isMedia = false; this.fileInfoModal.mediaHtml = ''; this.fileInfoModal.isLarge = false; this.fileInfoModal.isPreviewLoading = false; this.fileInfoModal.needsLoad = false; this.fileInfoModal.tooLarge = false; this.fileInfoModal.bypassWarning = false; this.fileInfoModal.unsupportedMedia = false; } }, 300);
         },
         openImageViewer(src, filename) {
             if (this.imageViewer.src === src) {
@@ -3095,6 +4842,1170 @@ function shareApp() {
             this.lightboxLoading = true;
             this.imageViewer = { show: true, src, filename };
         },
+        saveComicProgress() {
+            if (this.comicViewer.file && this.comicViewer.file.id) {
+                try {
+                    localStorage.setItem(`comic-page-${this.comicViewer.file.id}`, this.comicViewer.currentPageIndex);
+                } catch(e) {}
+            }
+        },
+        toggleComicScrollMode() {
+            const nextMode = this.comicViewer.scrollMode === 'page' ? 'continuous' : 'page';
+            this.comicViewer.scrollMode = nextMode;
+            if (nextMode === 'continuous') {
+                this.$nextTick(() => {
+                    setTimeout(() => {
+                        const container = document.getElementById('comic-continuous-container') || 
+                                          document.getElementById('share-comic-continuous-container') || 
+                                          document.getElementById('share-folder-comic-continuous-container');
+                        if (container) {
+                            const wrapper = container.querySelector(`.comic-page-wrapper[data-index="${this.comicViewer.currentPageIndex}"]`);
+                            if (wrapper) {
+                                wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                            }
+                        }
+                    }, 100);
+                });
+            } else {
+                this.loadComicPage();
+            }
+        },
+        openComicViewer(file, isShare = false, shareToken = '') {
+            this.comicViewer.show = true;
+            this.comicViewer.file = file;
+            this.comicViewer.pages = [];
+            this.comicViewer.pageUrls = [];
+            
+            let savedPage = 0;
+            if (file && file.id) {
+                try {
+                    const saved = localStorage.getItem(`comic-page-${file.id}`);
+                    if (saved !== null) {
+                        savedPage = parseInt(saved, 10) || 0;
+                    }
+                } catch(e) {}
+            }
+            this.comicViewer.currentPageIndex = savedPage;
+            
+            this.comicViewer.scrollMode = 'page';
+            this.comicViewer.loading = true;
+            this.comicViewer.settingsOpen = false;
+            
+            const hasShareToken = !!(this.shareToken || this.token || shareToken);
+            const token = this.shareToken || this.token || shareToken;
+            
+            const listUrl = hasShareToken 
+                ? (file.id ? `/s/${token}/file/${file.id}/cbz/list` : `/s/${token}/cbz/list`)
+                : `/api/files/${file.id}/cbz/list`;
+
+            fetch(listUrl)
+                .then(res => {
+                    if (!res.ok) throw new Error("Failed to load comic structure");
+                    return res.json();
+                })
+                .then(data => {
+                    if (!this.comicViewer.show || !this.comicViewer.file || String(this.comicViewer.file.id) !== String(file.id) || this.comicViewer.file.filename !== file.filename) return;
+                    this.comicViewer.pages = data.pages || [];
+                    
+                    if (file) {
+                        this.comicViewer.pageUrls = this.comicViewer.pages.map(pagePath => {
+                            return hasShareToken
+                                ? (file.id ? `/s/${token}/file/${file.id}/cbz/page?path=${encodeURIComponent(pagePath)}` : `/s/${token}/cbz/page?path=${encodeURIComponent(pagePath)}`)
+                                : `/api/files/${file.id}/cbz/page?path=${encodeURIComponent(pagePath)}`;
+                        });
+                    } else {
+                        this.comicViewer.pageUrls = [];
+                    }
+                    
+                    this.comicViewer.loading = false;
+                    if (this.comicViewer.pages.length > 0) {
+                        if (this.comicViewer.currentPageIndex >= this.comicViewer.pages.length) {
+                            this.comicViewer.currentPageIndex = 0;
+                        }
+                        this.loadComicPage(token);
+                        this.preloadNextComicPage();
+
+                        this.$nextTick(() => {
+                            const container = document.getElementById('comic-continuous-container') || 
+                                              document.getElementById('share-comic-continuous-container') || 
+                                              document.getElementById('share-folder-comic-continuous-container');
+                            if (container) {
+                                container.onscroll = () => {
+                                    if (this.comicViewer.scrollMode !== 'continuous') return;
+                                    const wrappers = container.querySelectorAll('.comic-page-wrapper');
+                                    let activeIndex = 0;
+                                    let minDiff = Infinity;
+                                    wrappers.forEach((wrapper, idx) => {
+                                        const rect = wrapper.getBoundingClientRect();
+                                        const diff = Math.abs(rect.top);
+                                        if (diff < minDiff) {
+                                            minDiff = diff;
+                                            activeIndex = idx;
+                                        }
+                                    });
+                                    if (activeIndex !== this.comicViewer.currentPageIndex && activeIndex >= 0 && activeIndex < this.comicViewer.pages.length) {
+                                        this.comicViewer.currentPageIndex = activeIndex;
+                                        this.saveComicProgress();
+                                    }
+                                };
+                            }
+
+                            setTimeout(() => {
+                                if (this.comicViewer.scrollMode === 'continuous') {
+                                    if (container) {
+                                        const wrapper = container.querySelector(`.comic-page-wrapper[data-index="${this.comicViewer.currentPageIndex}"]`);
+                                        if (wrapper) {
+                                            wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                                        }
+                                    }
+                                }
+                            }, 400);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    this.showToast(this.t('err_loading_comic'), 'error');
+                    this.comicViewer.show = false;
+                    this.comicViewer.loading = false;
+                });
+        },
+        loadComicPage(tokenOpt) {
+            if (this.comicViewer.currentPageIndex < 0 || this.comicViewer.currentPageIndex >= this.comicViewer.pages.length) return;
+            const file = this.comicViewer.file;
+            if (!file) return;
+            
+            const pageUrl = this.comicViewer.pageUrls[this.comicViewer.currentPageIndex];
+            if (!pageUrl) return;
+            
+            this.comicViewer.pageLoading = true;
+            
+            const img = new Image();
+            img.onload = () => {
+                this.comicViewer.pageLoading = false;
+            };
+            img.onerror = () => {
+                this.comicViewer.pageLoading = false;
+            };
+            img.src = pageUrl;
+        },
+        nextComicPage() {
+            if (this.comicViewer.currentPageIndex < this.comicViewer.pages.length - 1) {
+                this.comicViewer.currentPageIndex++;
+                this.loadComicPage();
+                this.preloadNextComicPage();
+                this.saveComicProgress();
+            }
+        },
+        prevComicPage() {
+            if (this.comicViewer.currentPageIndex > 0) {
+                this.comicViewer.currentPageIndex--;
+                this.loadComicPage();
+                this.saveComicProgress();
+            }
+        },
+        preloadNextComicPage() {
+            const nextIndex = this.comicViewer.currentPageIndex + 1;
+            if (nextIndex < this.comicViewer.pages.length) {
+                const file = this.comicViewer.file;
+                if (!file) return;
+                
+                const pageUrl = this.comicViewer.pageUrls[nextIndex];
+                if (!pageUrl) return;
+                
+                const img = new Image();
+                img.src = pageUrl;
+            }
+        },
+        closeComicViewer() {
+            if (window._comicAutoScrollRaf) {
+                cancelAnimationFrame(window._comicAutoScrollRaf);
+                window._comicAutoScrollRaf = null;
+            }
+            if (window._comicIntersectionObserver) {
+                window._comicIntersectionObserver.disconnect();
+                window._comicIntersectionObserver = null;
+            }
+            this.comicViewer.show = false;
+            this.comicViewer.autoScrollActive = false;
+            const urls = this.comicViewer.pageUrls ? [...this.comicViewer.pageUrls] : [];
+            setTimeout(() => {
+                if (this.comicViewer.show) return; // viewer was reopened — leave state alone
+                const pageImg = document.getElementById('comic-viewer-img') || document.getElementById('comic-viewer-img-file') || document.getElementById('comic-viewer-img-folder');
+                if (pageImg) pageImg.removeAttribute('src');
+                this.comicViewer.file = null;
+                this.comicViewer.pages = [];
+                this.comicViewer.pageUrls = [];
+                this.comicViewer.settingsOpen = false;
+                urls.forEach(u => { if (u && u.startsWith('blob:')) try { URL.revokeObjectURL(u); } catch(e) {} });
+            }, 400);
+        },
+        toggleComicAutoScroll() {
+            this.comicViewer.autoScrollActive = !this.comicViewer.autoScrollActive;
+            if (this.comicViewer.autoScrollActive) {
+                this.startComicAutoScroll();
+            } else {
+                this.stopComicAutoScroll();
+            }
+        },
+        startComicAutoScroll() {
+            if (window._comicAutoScrollRaf) {
+                cancelAnimationFrame(window._comicAutoScrollRaf);
+            }
+            const scrollLoop = () => {
+                if (!this.comicViewer.show || !this.comicViewer.autoScrollActive) {
+                    this.comicViewer.autoScrollActive = false;
+                    if (window._comicAutoScrollRaf) {
+                        cancelAnimationFrame(window._comicAutoScrollRaf);
+                        window._comicAutoScrollRaf = null;
+                    }
+                    return;
+                }
+                try {
+                    const container = document.getElementById('comic-continuous-container') || 
+                                      document.getElementById('share-comic-continuous-container') || 
+                                      document.getElementById('share-folder-comic-continuous-container');
+                    if (container) {
+                        container.scrollTop += Math.pow(this.comicViewer.autoScrollSpeed, 2) * 0.25;
+                    } else {
+                        this.stopComicAutoScroll();
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Comic auto-scroll error:", e);
+                    this.stopComicAutoScroll();
+                    return;
+                }
+                window._comicAutoScrollRaf = requestAnimationFrame(scrollLoop);
+            };
+            window._comicAutoScrollRaf = requestAnimationFrame(scrollLoop);
+        },
+        stopComicAutoScroll() {
+            this.comicViewer.autoScrollActive = false;
+            if (window._comicAutoScrollRaf) {
+                cancelAnimationFrame(window._comicAutoScrollRaf);
+                window._comicAutoScrollRaf = null;
+            }
+        },
+        changeComicAutoScrollSpeed(amount) {
+            this.comicViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.comicViewer.autoScrollSpeed + amount));
+        },
+        openEpubViewer(file, isShare = false, shareToken = '') {
+            this._transitioningChapter = false;
+            this.epubViewer.show = true;
+            this.epubViewer.file = file;
+            this.epubViewer.loading = true;
+            this.epubViewer.toc = [];
+            this.epubViewer.sidebarOpen = false;
+            this.epubViewer.fontSize = 100;
+            this.epubViewer.pageProgress = 0;
+            this.epubViewer.spine = [];
+            this.epubViewer.currentChapter = 0;
+            this.epubViewer.title = '';
+            this.epubViewer.settingsOpen = false;
+            
+            const token = this.shareToken || this.token || shareToken || '';
+            const hasShareToken = !!token;
+            
+            const metaUrl = hasShareToken
+                ? (file.id ? `/s/${token}/file/${file.id}/epub/meta` : `/s/${token}/epub/meta`)
+                : `/api/files/${file.id}/epub/meta`;
+            
+            const resourceBaseUrl = hasShareToken
+                ? (file.id ? `/s/${token}/file/${file.id}/epub/resource` : `/s/${token}/epub/resource`)
+                : `/api/files/${file.id}/epub/resource`;
+            
+            this.epubViewer.resourceBaseUrl = resourceBaseUrl;
+
+            // Clean up previous
+            if (window._epubBook) {
+                try { window._epubBook.destroy(); } catch(e) {}
+                window._epubBook = null;
+                window._epubRendition = null;
+            }
+
+            this.$nextTick(() => {
+                const area = document.getElementById('epub-viewer-area');
+                if (area) area.innerHTML = '<iframe id="epub-iframe" class="w-full h-full border-0" sandbox="allow-same-origin" style="background:#fff"></iframe>';
+                
+                (async () => {
+                    try {
+                        const res = await fetch(metaUrl, { credentials: 'same-origin' });
+                        if (!res.ok) throw new Error('meta_fetch_failed');
+                        const meta = await res.json();
+                        
+                        if (!this.epubViewer.show || !this.epubViewer.file || String(this.epubViewer.file.id) !== String(file.id) || this.epubViewer.file.filename !== file.filename) return;
+                        
+                        // Flatten TOC recursively and add indent levels + unique ids
+                        const flattenToc = (items, level = 0) => {
+                            let result = [];
+                            items.forEach((item, idx) => {
+                                result.push({
+                                    id: `toc-${level}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
+                                    label: item.label,
+                                    href: item.href,
+                                    level: level
+                                });
+                                if (item.children && item.children.length > 0) {
+                                    result = result.concat(flattenToc(item.children, level + 1));
+                                }
+                            });
+                            return result;
+                        };
+                        this.epubViewer.toc = flattenToc(meta.toc || []);
+                        this.epubViewer.spine = meta.spine || [];
+                        this.epubViewer.title = meta.title || file.filename;
+                        
+                        // Restore reading position
+                        const savedChapter = file.id ? parseInt(localStorage.getItem(`epub-ch-${file.id}`) || '0') : 0;
+                        this.epubViewer.currentChapter = Math.max(0, Math.min(savedChapter, this.epubViewer.spine.length - 1));
+                        
+                        this._loadEpubChapter(file);
+                    } catch (err) {
+                        console.error('EPUB meta failed:', err);
+                        if (this.epubViewer.file && String(this.epubViewer.file.id) === String(file.id) && this.epubViewer.file.filename === file.filename) {
+                            this.showToast(this.t('err_loading_epub'), 'error');
+                            this.epubViewer.show = false;
+                            this.epubViewer.loading = false;
+                        }
+                    }
+                })();
+            });
+        },
+        _normalizePath(p) {
+            if (!p) return '';
+            try { p = decodeURIComponent(p); } catch(e) {}
+            p = p.replace(/\\/g, '/'); // normalize backslashes
+            if (p.startsWith('./')) p = p.substring(2);
+            p = p.replace(/\/+/g, '/');
+            return p.trim();
+        },
+        _resolveRelativePath(base, relative) {
+            if (relative.startsWith('/')) return relative.substring(1);
+            if (relative.includes('://')) return relative;
+            
+            const baseParts = base.split('/');
+            baseParts.pop(); // remove filename
+            
+            const relParts = relative.split('/');
+            for (const part of relParts) {
+                if (part === '.' || part === '') {
+                    continue;
+                } else if (part === '..') {
+                    if (baseParts.length > 0) baseParts.pop();
+                } else {
+                    baseParts.push(part);
+                }
+            }
+            return baseParts.join('/');
+        },
+        _loadEpubChapter(file, startAtBottom = false) {
+            const chapter = this.epubViewer.spine[this.epubViewer.currentChapter];
+            if (!chapter) return;
+            
+            this.epubViewer.loading = true;
+            const iframe = document.getElementById('epub-iframe');
+            if (!iframe) return;
+            
+            iframe.onload = () => {
+                if (!this.epubViewer.show || !this.epubViewer.file || String(this.epubViewer.file.id) !== String(file.id) || this.epubViewer.file.filename !== file.filename) return;
+                this.epubViewer.loading = false;
+                this._transitioningChapter = false;
+                this.applyEpubTheme();
+                
+                const win = iframe.contentWindow;
+                const doc = iframe.contentDocument;
+                
+                // Intercept links inside the iframe
+                doc.querySelectorAll('a').forEach(a => {
+                    a.addEventListener('click', (e) => {
+                        const href = a.getAttribute('href');
+                        if (!href) return;
+                        
+                        if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+                            e.preventDefault();
+                            window.open(href, '_blank');
+                            return;
+                        }
+                        
+                        e.preventDefault();
+                        const currentChapter = this.epubViewer.spine[this.epubViewer.currentChapter];
+                        if (currentChapter) {
+                            const resolvedHref = this._resolveRelativePath(currentChapter.href, href);
+                            this.navigateToCfi(resolvedHref);
+                        }
+                    });
+                });
+
+                // Restore/set scroll position
+                if (startAtBottom) {
+                    try { win.scrollTo(0, doc.documentElement.scrollHeight || doc.body.scrollHeight || 999999); } catch(e) {}
+                } else {
+                    const savedScroll = file.id ? localStorage.getItem(`epub-scroll-${file.id}`) : null;
+                    if (savedScroll) {
+                        try { win.scrollTo(0, parseInt(savedScroll)); } catch(e) {}
+                        localStorage.removeItem(`epub-scroll-${file.id}`);
+                    } else {
+                        win.scrollTo(0, 0);
+                    }
+                }
+                
+                // Add scroll listener inside the iframe to save progress and auto-navigate chapters
+                let lastScrollTime = 0;
+                let lastScrollTop = win.scrollY || doc.documentElement.scrollTop || 0;
+                
+                win.addEventListener('scroll', () => {
+                    const scrollTop = win.scrollY || doc.documentElement.scrollTop || 0;
+                    const scrollHeight = doc.documentElement.scrollHeight || doc.body.scrollHeight || 0;
+                    const clientHeight = doc.documentElement.clientHeight || win.innerHeight || 0;
+                    
+                    const isScrollingUp = scrollTop < lastScrollTop;
+                    lastScrollTop = scrollTop;
+                    
+                    // Throttle progress saving
+                    const now = Date.now();
+                    if (now - lastScrollTime > 1000) {
+                        this._saveEpubScroll();
+                        lastScrollTime = now;
+                    }
+                });
+
+
+            };
+            
+            iframe.src = `${this.epubViewer.resourceBaseUrl}/${chapter.href}`;
+            
+            // Save reading position
+            if (file.id) {
+                try { localStorage.setItem(`epub-ch-${file.id}`, this.epubViewer.currentChapter); } catch(e) {}
+            }
+            
+            // Update progress
+            if (this.epubViewer.spine.length > 0) {
+                this.epubViewer.pageProgress = Math.round(((this.epubViewer.currentChapter + 1) / this.epubViewer.spine.length) * 100);
+            }
+        },
+        nextEpubChapter() {
+            if (this.epubViewer.currentChapter < this.epubViewer.spine.length - 1) {
+                this._saveEpubScroll();
+                this.epubViewer.currentChapter++;
+                this._loadEpubChapter(this.epubViewer.file, false);
+            }
+        },
+        prevEpubChapter(startAtBottom = false) {
+            if (this.epubViewer.currentChapter > 0) {
+                this._saveEpubScroll();
+                this.epubViewer.currentChapter--;
+                this._loadEpubChapter(this.epubViewer.file, startAtBottom);
+            }
+        },
+        _saveEpubScroll() {
+            const iframe = document.getElementById('epub-iframe');
+            if (iframe && iframe.contentWindow && this.epubViewer.file && this.epubViewer.file.id) {
+                try { localStorage.setItem(`epub-scroll-${this.epubViewer.file.id}`, iframe.contentWindow.scrollY || iframe.contentDocument.documentElement.scrollTop || 0); } catch(e) {}
+            }
+        },
+        navigateToCfi(href) {
+            const fullHref = typeof href === 'string' ? href : (href && href.href ? href.href : '');
+            const parts = fullHref.split('#');
+            const rawBaseHref = parts[0];
+            const fragment = parts[1] || '';
+            
+            const baseHref = this._normalizePath(rawBaseHref);
+            
+            const idx = this.epubViewer.spine.findIndex(s => {
+                const spineHref = this._normalizePath(s.href);
+                return spineHref === baseHref || spineHref.endsWith('/' + baseHref) || baseHref.endsWith('/' + spineHref);
+            });
+            
+            if (idx >= 0) {
+                this.epubViewer.currentChapter = idx;
+                this._loadEpubChapter(this.epubViewer.file, false);
+                if (fragment) {
+                    setTimeout(() => {
+                        const iframe = document.getElementById('epub-iframe');
+                        if (iframe && iframe.contentDocument) {
+                            let el = iframe.contentDocument.getElementById(fragment);
+                            if (!el) {
+                                const els = iframe.contentDocument.getElementsByName(fragment);
+                                if (els && els.length > 0) el = els[0];
+                            }
+                            if (el) el.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }, 500);
+                }
+            }
+            this.epubViewer.sidebarOpen = false;
+        },
+        applyEpubTheme() {
+            const iframe = document.getElementById('epub-iframe');
+            if (!iframe || !iframe.contentDocument) return;
+            
+            const doc = iframe.contentDocument;
+            const win = iframe.contentWindow;
+            const isDark = document.documentElement.classList.contains('dark');
+            const bg = isDark ? '#1e293b' : '#ffffff';
+            const fg = isDark ? '#f1f5f9' : '#0f172a';
+            
+            let style = doc.getElementById('tc-epub-theme');
+            if (!style) {
+                style = doc.createElement('style');
+                style.id = 'tc-epub-theme';
+                doc.head.appendChild(style);
+            }
+            style.textContent = `
+                body { background: ${bg} !important; color: ${fg} !important; font-size: ${this.epubViewer.fontSize}% !important; line-height: 1.6 !important; padding: 20px !important; max-width: 800px !important; margin: 0 auto !important; font-family: Inter, system-ui, -apple-system, sans-serif !important; }
+                p, span, div, li, td, th, h1, h2, h3, h4, h5, h6 { color: ${fg} !important; }
+                a { color: #3b82f6 !important; }
+                img, svg { max-width: 100% !important; height: auto !important; }
+                
+                /* Custom slim scrollbar inside iframe */
+                ::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+                ::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                ::-webkit-scrollbar-thumb {
+                    background: ${isDark ? '#475569' : '#cbd5e1'};
+                    border-radius: 4px;
+                }
+                ::-webkit-scrollbar-thumb:hover {
+                    background: ${isDark ? '#64748b' : '#94a3b8'};
+                }
+            `;
+        },
+        changeEpubFontSize(delta) {
+            this.epubViewer.fontSize = Math.max(50, Math.min(250, this.epubViewer.fontSize + delta));
+            this.applyEpubTheme();
+        },
+        nextEpubPage() { this.nextEpubChapter(); },
+        prevEpubPage() { this.prevEpubChapter(); },
+        closeEpubViewer() {
+            if (window._epubAutoScrollRaf) {
+                cancelAnimationFrame(window._epubAutoScrollRaf);
+                window._epubAutoScrollRaf = null;
+            }
+            this._transitioningChapter = false;
+            try { this._saveEpubScroll(); } catch(e) {}
+            this.epubViewer.show = false;
+            this.epubViewer.autoScrollActive = false;
+            setTimeout(() => {
+                const iframe = document.getElementById('epub-iframe');
+                if (iframe) { iframe.onload = null; iframe.src = 'about:blank'; }
+                if (window._epubBook) {
+                    try { window._epubBook.destroy(); } catch(e) {}
+                    window._epubBook = null;
+                    window._epubRendition = null;
+                }
+                const area = document.getElementById('epub-viewer-area');
+                if (area) area.innerHTML = '';
+                this.epubViewer.file = null;
+                this.epubViewer.toc = [];
+                this.epubViewer.spine = [];
+                this.epubViewer.settingsOpen = false;
+            }, 400);
+        },
+        toggleEpubAutoScroll() {
+            this.epubViewer.autoScrollActive = !this.epubViewer.autoScrollActive;
+            if (this.epubViewer.autoScrollActive) {
+                this.startEpubAutoScroll();
+            } else {
+                this.stopEpubAutoScroll();
+            }
+        },
+        startEpubAutoScroll() {
+            if (window._epubAutoScrollRaf) cancelAnimationFrame(window._epubAutoScrollRaf);
+            const scrollLoop = () => {
+                if (!this.epubViewer.show || !this.epubViewer.autoScrollActive) {
+                    this.epubViewer.autoScrollActive = false;
+                    if (window._epubAutoScrollRaf) {
+                        cancelAnimationFrame(window._epubAutoScrollRaf);
+                        window._epubAutoScrollRaf = null;
+                    }
+                    return;
+                }
+                // Skip scrolling while chapter is transitioning to avoid accessing a reloading iframe
+                if (this._transitioningChapter) {
+                    window._epubAutoScrollRaf = requestAnimationFrame(scrollLoop);
+                    return;
+                }
+                try {
+                    const iframe = document.getElementById('epub-iframe');
+                    if (iframe && iframe.contentWindow && iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+                        iframe.contentWindow.scrollBy(0, Math.pow(this.epubViewer.autoScrollSpeed, 2) * 0.25);
+                    } else if (!iframe) {
+                        this.stopEpubAutoScroll();
+                        return;
+                    }
+                    // If iframe exists but not ready, just skip this frame
+                } catch (e) {
+                    // Silently skip - iframe may be reloading during chapter transition
+                    if (!this.epubViewer.show) {
+                        this.stopEpubAutoScroll();
+                        return;
+                    }
+                }
+                window._epubAutoScrollRaf = requestAnimationFrame(scrollLoop);
+            };
+            window._epubAutoScrollRaf = requestAnimationFrame(scrollLoop);
+        },
+        stopEpubAutoScroll() {
+            this.epubViewer.autoScrollActive = false;
+            if (window._epubAutoScrollRaf) {
+                cancelAnimationFrame(window._epubAutoScrollRaf);
+                window._epubAutoScrollRaf = null;
+            }
+        },
+        changeEpubAutoScrollSpeed(amount) {
+            this.epubViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.epubViewer.autoScrollSpeed + amount));
+        },
+        openPdfViewer(file, isShare = false, shareToken = '') {
+            this.pdfViewer.show = true;
+            this.pdfViewer.file = file;
+            this.pdfViewer.loading = true;
+            this.pdfViewer.pageLoading = true;
+            this.pdfViewer.sidebarOpen = false;
+            this.pdfViewer.zoom = 'width';
+            this.pdfViewer.pageProgress = 0;
+            this.pdfViewer.currentPage = 1;
+            this.pdfViewer.numPages = 0;
+            this.pdfViewer.settingsOpen = false;
+            this.pdfViewer.toc = [];
+            this.pdfViewer.autoScrollActive = false;
+            this.pdfViewer.autoScrollSpeed = 2;
+            
+            const isDarkGlobal = document.documentElement.classList.contains('dark');
+            this.pdfViewer.darkModeFilter = isDarkGlobal;
+
+            const token = this.shareToken || this.token || shareToken || '';
+            const hasShareToken = !!token;
+            
+            let downloadUrl;
+            if (hasShareToken) {
+                if (file && file.id) {
+                    downloadUrl = `/s/${token}/file/${file.id}/stream`;
+                } else {
+                    downloadUrl = `/s/${token}/stream`;
+                }
+            } else {
+                downloadUrl = `/download/${file.id}`;
+            }
+
+            if (window._pdfLoadingTask) {
+                try { window._pdfLoadingTask.destroy(); } catch(e) {}
+                window._pdfLoadingTask = null;
+            }
+            if (window._pdfRenderTask) {
+                try { window._pdfRenderTask.cancel(); } catch(e) {}
+                window._pdfRenderTask = null;
+            }
+            window._pdfDoc = null;
+
+            if (window._pdfResizeHandler) {
+                window.removeEventListener('resize', window._pdfResizeHandler);
+            }
+            window._pdfResizeHandler = () => {
+                if (this.pdfViewer.show && (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height')) {
+                    if (window._pdfResizeTimeout) clearTimeout(window._pdfResizeTimeout);
+                    window._pdfResizeTimeout = setTimeout(() => {
+                        if (this.pdfViewer.scrollMode === 'continuous') {
+                            const container = document.getElementById('pdf-continuous-container') || 
+                                              document.getElementById('share-pdf-continuous-container') || 
+                                              document.getElementById('share-folder-pdf-continuous-container');
+                            if (container) {
+                                const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                                const containerRect = container.getBoundingClientRect();
+                                wrappers.forEach(wrapper => {
+                                    const canvas = wrapper.querySelector('canvas');
+                                    if (canvas) canvas.removeAttribute('data-rendered');
+                                    const rect = wrapper.getBoundingClientRect();
+                                    if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                                        const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                                        this.renderPdfContinuousPage(pageNum);
+                                    }
+                                });
+                            }
+                        } else {
+                            this.renderPdfPage(this.pdfViewer.currentPage);
+                        }
+                    }, 150);
+                }
+            };
+            window.addEventListener('resize', window._pdfResizeHandler);
+
+            this.$nextTick(async () => {
+                try {
+                    const loadingTask = pdfjsLib.getDocument({ url: downloadUrl, withCredentials: true });
+                    window._pdfLoadingTask = loadingTask;
+                    
+                    const pdfDoc = await loadingTask.promise;
+                    if (!this.pdfViewer.show || !this.pdfViewer.file || String(this.pdfViewer.file.id || '') !== String(file.id || '') || this.pdfViewer.file.filename !== file.filename) {
+                        return;
+                    }
+                    
+                    window._pdfDoc = pdfDoc;
+                    this.pdfViewer.numPages = pdfDoc.numPages;
+                    this.pdfViewer.loading = false;
+
+                    try {
+                        const outline = await pdfDoc.getOutline();
+                        if (outline && outline.length > 0) {
+                            const resolveOutline = async (items) => {
+                                const result = [];
+                                for (const item of items) {
+                                    let pageNumber = null;
+                                    if (item.dest) {
+                                        try {
+                                            let dest = item.dest;
+                                            if (typeof dest === 'string') {
+                                                dest = await pdfDoc.getDestination(dest);
+                                            }
+                                            if (dest && Array.isArray(dest)) {
+                                                const pageRef = dest[0];
+                                                const pageIndex = await pdfDoc.getPageIndex(pageRef);
+                                                pageNumber = pageIndex + 1;
+                                            }
+                                        } catch (e) {
+                                            console.error("Outline dest resolution error:", e);
+                                        }
+                                    }
+                                    const node = { title: item.title, page: pageNumber };
+                                    if (item.items && item.items.length > 0) {
+                                        node.children = await resolveOutline(item.items);
+                                    }
+                                    result.push(node);
+                                }
+                                return result;
+                            };
+                            const resolved = await resolveOutline(outline);
+                            const flatten = (nodes, depth = 0) => {
+                                let list = [];
+                                nodes.forEach(n => {
+                                    list.push({ title: n.title, page: n.page, depth });
+                                    if (n.children) {
+                                        list = list.concat(flatten(n.children, depth + 1));
+                                    }
+                                });
+                                return list;
+                            };
+                            this.pdfViewer.toc = flatten(resolved);
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse outline:", e);
+                    }
+
+                    let startPage = 1;
+                    if (file && file.id) {
+                        const saved = localStorage.getItem(`pdf-page-${file.id}`);
+                        if (saved) {
+                            const p = parseInt(saved);
+                            if (p >= 1 && p <= pdfDoc.numPages) {
+                                startPage = p;
+                            }
+                        }
+                        const savedMode = localStorage.getItem(`pdf-scroll-mode-${file.id}`);
+                        if (savedMode) {
+                            this.pdfViewer.scrollMode = savedMode;
+                        } else {
+                            this.pdfViewer.scrollMode = 'page';
+                        }
+                    } else {
+                        this.pdfViewer.scrollMode = 'page';
+                    }
+                    this.pdfViewer.currentPage = startPage;
+                    this.pdfViewer.pageProgress = Math.round((startPage / pdfDoc.numPages) * 100);
+                    if (this.pdfViewer.scrollMode === 'continuous') {
+                        this.$nextTick(() => {
+                            setTimeout(() => {
+                                const container = document.getElementById('pdf-continuous-container') || 
+                                                  document.getElementById('share-pdf-continuous-container') || 
+                                                  document.getElementById('share-folder-pdf-continuous-container');
+                                if (container) {
+                                    const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${startPage}"]`);
+                                    if (wrapper) {
+                                        wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                                    }
+                                }
+                            }, 300);
+                        });
+                    } else {
+                        this.renderPdfPage(startPage);
+                    }
+
+                } catch (err) {
+                    console.error("PDF.js initialization failed:", err);
+                    this.showToast(this.t('err_loading_pdf'), 'error');
+                    this.pdfViewer.show = false;
+                    this.pdfViewer.loading = false;
+                    this.pdfViewer.pageLoading = false;
+                }
+            });
+        },
+        renderPdfPage(pageNumber) {
+            if (!window._pdfDoc) return;
+            if (pageNumber < 1 || pageNumber > this.pdfViewer.numPages) return;
+            
+            this.pdfViewer.pageLoading = true;
+            this.pdfViewer.currentPage = pageNumber;
+            
+            if (this.pdfViewer.file && this.pdfViewer.file.id) {
+                try { localStorage.setItem(`pdf-page-${this.pdfViewer.file.id}`, pageNumber); } catch(e) {}
+            }
+            
+            this.pdfViewer.pageProgress = Math.round((pageNumber / this.pdfViewer.numPages) * 100);
+            
+            if (window._pdfRenderTask) {
+                try { window._pdfRenderTask.cancel(); } catch(e) {}
+                window._pdfRenderTask = null;
+            }
+            
+            window._pdfDoc.getPage(pageNumber).then(page => {
+                const canvas = document.getElementById('pdf-canvas');
+                if (!canvas) {
+                    this.pdfViewer.pageLoading = false;
+                    return;
+                }
+                
+                const context = canvas.getContext('2d');
+                const container = document.getElementById('pdf-viewer-area');
+                if (!container) {
+                    this.pdfViewer.pageLoading = false;
+                    return;
+                }
+                
+                let scale = 1.0;
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                
+                if (this.pdfViewer.zoom === 'width') {
+                    scale = (container.clientWidth - 32) / unscaledViewport.width;
+                } else if (this.pdfViewer.zoom === 'height') {
+                    scale = (container.clientHeight - 32) / unscaledViewport.height;
+                } else {
+                    scale = (parseInt(this.pdfViewer.zoom) || 100) / 100;
+                }
+                
+                const outputScale = window.devicePixelRatio || 1;
+                const viewport = page.getViewport({ scale: scale });
+                
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + "px";
+                canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                const transform = outputScale !== 1
+                    ? [outputScale, 0, 0, outputScale, 0, 0]
+                    : null;
+                
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport,
+                    transform: transform
+                };
+                
+                const renderTask = page.render(renderContext);
+                window._pdfRenderTask = renderTask;
+                
+                renderTask.promise.then(() => {
+                    this.pdfViewer.pageLoading = false;
+                    window._pdfRenderTask = null;
+                }).catch(err => {
+                    if (err.name === 'RenderingCancelledException') return;
+                    console.error("PDF page rendering error:", err);
+                    this.pdfViewer.pageLoading = false;
+                });
+            }).catch(err => {
+                console.error("Failed to render PDF page:", err);
+                this.pdfViewer.pageLoading = false;
+            });
+        },
+        pdfZoomIn() {
+            if (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height') {
+                this.pdfViewer.zoom = 100;
+            } else {
+                this.pdfViewer.zoom = Math.min(300, this.pdfViewer.zoom + 25);
+            }
+            if (this.pdfViewer.scrollMode === 'continuous') {
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (container) {
+                    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                    const containerRect = container.getBoundingClientRect();
+                    wrappers.forEach(wrapper => {
+                        const canvas = wrapper.querySelector('canvas');
+                        if (canvas) canvas.removeAttribute('data-rendered');
+                        const rect = wrapper.getBoundingClientRect();
+                        if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                            const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                            this.renderPdfContinuousPage(pageNum);
+                        }
+                    });
+                }
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        pdfZoomOut() {
+            if (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height') {
+                this.pdfViewer.zoom = 100;
+            } else {
+                this.pdfViewer.zoom = Math.max(50, this.pdfViewer.zoom - 25);
+            }
+            if (this.pdfViewer.scrollMode === 'continuous') {
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (container) {
+                    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                    const containerRect = container.getBoundingClientRect();
+                    wrappers.forEach(wrapper => {
+                        const canvas = wrapper.querySelector('canvas');
+                        if (canvas) canvas.removeAttribute('data-rendered');
+                        const rect = wrapper.getBoundingClientRect();
+                        if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                            const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                            this.renderPdfContinuousPage(pageNum);
+                        }
+                    });
+                }
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        pdfSetZoom(val) {
+            this.pdfViewer.zoom = val;
+            if (this.pdfViewer.scrollMode === 'continuous') {
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (container) {
+                    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                    const containerRect = container.getBoundingClientRect();
+                    wrappers.forEach(wrapper => {
+                        const canvas = wrapper.querySelector('canvas');
+                        if (canvas) canvas.removeAttribute('data-rendered');
+                        const rect = wrapper.getBoundingClientRect();
+                        if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                            const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                            this.renderPdfContinuousPage(pageNum);
+                        }
+                    });
+                }
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        pdfNextPage() {
+            if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
+                this.renderPdfPage(this.pdfViewer.currentPage + 1);
+                this.$nextTick(() => {
+                    const area = document.getElementById('pdf-viewer-area');
+                    if (area) area.scrollTop = 0;
+                });
+            }
+        },
+        pdfPrevPage() {
+            if (this.pdfViewer.currentPage > 1) {
+                this.renderPdfPage(this.pdfViewer.currentPage - 1);
+                this.$nextTick(() => {
+                    const area = document.getElementById('pdf-viewer-area');
+                    if (area) area.scrollTop = 0;
+                });
+            }
+        },
+        pdfJumpToPage(page) {
+            const p = parseInt(page);
+            if (p >= 1 && p <= this.pdfViewer.numPages) {
+                this.renderPdfPage(p);
+                this.$nextTick(() => {
+                    const area = document.getElementById('pdf-viewer-area');
+                    if (area) area.scrollTop = 0;
+                });
+            }
+        },
+        closePdfViewer() {
+            if (window._pdfIntersectionObserver) {
+                window._pdfIntersectionObserver.disconnect();
+                window._pdfIntersectionObserver = null;
+            }
+            if (window._pdfAutoScrollRaf) {
+                cancelAnimationFrame(window._pdfAutoScrollRaf);
+                window._pdfAutoScrollRaf = null;
+            }
+            this.pdfViewer.show = false;
+            this.pdfViewer.autoScrollActive = false;
+            
+            if (window._pdfResizeHandler) {
+                window.removeEventListener('resize', window._pdfResizeHandler);
+                window._pdfResizeHandler = null;
+            }
+            setTimeout(() => {
+                if (window._pdfLoadingTask) {
+                    try { window._pdfLoadingTask.destroy(); } catch(e) {}
+                    window._pdfLoadingTask = null;
+                }
+                if (window._pdfRenderTask) {
+                    try { window._pdfRenderTask.cancel(); } catch(e) {}
+                    window._pdfRenderTask = null;
+                }
+                window._pdfDoc = null;
+                const canvas = document.getElementById('pdf-canvas');
+                if (canvas) {
+                    const context = canvas.getContext('2d');
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                }
+                this.pdfViewer.file = null;
+                this.pdfViewer.toc = [];
+                this.pdfViewer.settingsOpen = false;
+            }, 400);
+        },
+        togglePdfAutoScroll() {
+            this.pdfViewer.autoScrollActive = !this.pdfViewer.autoScrollActive;
+            if (this.pdfViewer.autoScrollActive) {
+                this.startPdfAutoScroll();
+            } else {
+                this.stopPdfAutoScroll();
+            }
+        },
+        startPdfAutoScroll() {
+            if (window._pdfAutoScrollRaf) cancelAnimationFrame(window._pdfAutoScrollRaf);
+            const scrollLoop = () => {
+                if (!this.pdfViewer.show || !this.pdfViewer.autoScrollActive) {
+                    this.pdfViewer.autoScrollActive = false;
+                    if (window._pdfAutoScrollRaf) {
+                        cancelAnimationFrame(window._pdfAutoScrollRaf);
+                        window._pdfAutoScrollRaf = null;
+                    }
+                    return;
+                }
+                try {
+                    const container = document.getElementById('pdf-viewer-area');
+                    if (container) {
+                        container.scrollBy(0, Math.pow(this.pdfViewer.autoScrollSpeed, 2) * 0.25);
+                        if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
+                            if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
+                                this.pdfNextPage();
+                                container.scrollTop = 0;
+                            } else {
+                                this.stopPdfAutoScroll();
+                                return;
+                            }
+                        }
+                    } else {
+                        this.stopPdfAutoScroll();
+                        return;
+                    }
+                } catch (e) {
+                    if (!this.pdfViewer.show) {
+                        this.stopPdfAutoScroll();
+                        return;
+                    }
+                }
+                window._pdfAutoScrollRaf = requestAnimationFrame(scrollLoop);
+            };
+            window._pdfAutoScrollRaf = requestAnimationFrame(scrollLoop);
+        },
+        stopPdfAutoScroll() {
+            this.pdfViewer.autoScrollActive = false;
+            if (window._pdfAutoScrollRaf) {
+                cancelAnimationFrame(window._pdfAutoScrollRaf);
+                window._pdfAutoScrollRaf = null;
+            }
+        },
+        changePdfAutoScrollSpeed(amount) {
+            this.pdfViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.pdfViewer.autoScrollSpeed + amount));
+        },
+        renderPdfContinuousPage(pageNum) {
+            if (!window._pdfDoc) return;
+            const canvas = document.getElementById(`pdf-canvas-${pageNum}`);
+            if (!canvas || canvas.getAttribute('data-rendered') === 'true') return;
+            
+            window._pdfDoc.getPage(pageNum).then(page => {
+                const context = canvas.getContext('2d');
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (!container) return;
+                
+                let scale = 1.0;
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                
+                if (this.pdfViewer.zoom === 'width') {
+                    scale = (container.clientWidth - 32) / unscaledViewport.width;
+                } else if (this.pdfViewer.zoom === 'height') {
+                    scale = (container.clientHeight - 32) / unscaledViewport.height;
+                } else {
+                    scale = (parseInt(this.pdfViewer.zoom) || 100) / 100;
+                }
+                
+                const outputScale = window.devicePixelRatio || 1;
+                const viewport = page.getViewport({ scale: scale });
+                
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + "px";
+                canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport,
+                    transform: transform
+                };
+                
+                page.render(renderContext).promise.then(() => {
+                    canvas.setAttribute('data-rendered', 'true');
+                });
+            });
+        },
+        trackPdfContinuousScroll(container) {
+            if (this.pdfViewer.scrollMode !== 'continuous') return;
+            const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+            let activePage = 1;
+            let minDiff = Infinity;
+            const containerTop = container.getBoundingClientRect().top;
+            wrappers.forEach((wrapper) => {
+                const rect = wrapper.getBoundingClientRect();
+                const diff = Math.abs(rect.top - containerTop);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    activePage = parseInt(wrapper.getAttribute('data-page'), 10);
+                }
+            });
+            if (activePage !== this.pdfViewer.currentPage) {
+                this.pdfViewer.currentPage = activePage;
+                this.pdfViewer.pageProgress = Math.round((activePage / this.pdfViewer.numPages) * 100);
+                if (this.pdfViewer.file && this.pdfViewer.file.id) {
+                    try { localStorage.setItem(`pdf-page-${this.pdfViewer.file.id}`, activePage); } catch(e) {}
+                }
+            }
+        },
+        togglePdfScrollMode() {
+            const nextMode = this.pdfViewer.scrollMode === 'page' ? 'continuous' : 'page';
+            this.pdfViewer.scrollMode = nextMode;
+            if (this.pdfViewer.file && this.pdfViewer.file.id) {
+                try { localStorage.setItem(`pdf-scroll-mode-${this.pdfViewer.file.id}`, nextMode); } catch(e) {}
+            }
+            if (nextMode === 'continuous') {
+                this.$nextTick(() => {
+                    setTimeout(() => {
+                        const container = document.getElementById('pdf-continuous-container') || 
+                                          document.getElementById('share-pdf-continuous-container') || 
+                                          document.getElementById('share-folder-pdf-continuous-container');
+                        if (container) {
+                            const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${this.pdfViewer.currentPage}"]`);
+                            if (wrapper) {
+                                wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                            }
+                        }
+                    }, 100);
+                });
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
         async showFileInfo(file) {
             if (file.is_folder) return;
             const typeData = this.getFileTypeData(file.filename);
@@ -3103,6 +6014,10 @@ function shareApp() {
             const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'ogv', '3gp', 'flv', 'wmv'];
             const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus', 'oga', 'aac', 'm4b'];
             const textExts = ['txt', 'md', 'log', 'json', 'js', 'py', 'go', 'html', 'css', 'yml', 'yaml', 'sql', 'sh', 'conf', 'ini', 'c', 'cpp', 'h', 'hpp', 'cs', 'java', 'rb', 'rs', 'swift'];
+            const isComicOrEpubOrPdf = (typeData.n === 'type_comic' || typeData.n === 'type_epub' || typeData.n === 'type_pdf');
+            const isTooLarge = (imgExts.includes(ext) && file.size > 50 * 1024 * 1024) || 
+                               (isComicOrEpubOrPdf && file.size > 150 * 1024 * 1024) || 
+                               (textExts.includes(ext) && file.size > 10 * 1024 * 1024);
             
             const mimeTypes = { 
                 'mp4': 'video/mp4', 'webm': 'video/webm', 'ogg': 'video/ogg', 'ogv': 'video/ogg',
@@ -3117,22 +6032,22 @@ function shareApp() {
             if (mediaHtml) {
                 isMedia = true;
                 isLarge = true; // Make media modals larger by default
-                if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif'].includes(ext) && file.size > 50 * 1024 * 1024) this.fileInfoModal.tooLarge = true;
-                if (videoExts.includes(ext) || audioExts.includes(ext)) {
+                if ((videoExts.includes(ext) || audioExts.includes(ext)) && !(TeleCloud.isAppleDevice() && ext === 'mkv')) {
                     playerTarget = { el: '#tele-player', type: videoExts.includes(ext) ? 'video' : 'audio' };
                 }
             } else if (textExts.includes(ext)) {
-                this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: false, mediaHtml: '', isLarge: true, isPreviewLoading: false, needsLoad: false, tooLarge: false };
+                this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: false, mediaHtml: '', isLarge: true, isPreviewLoading: false, needsLoad: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: false };
                 
-                if (file.size > 50 * 1024 * 1024) {
-                    this.fileInfoModal.tooLarge = true;
+                if (isTooLarge) {
+                    // Handled by tooLarge property
                 } else {
                     this.fileInfoModal.needsLoad = true;
                 }
                 return;
             }
             
-            this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: isMedia, mediaHtml: mediaHtml, isLarge: isLarge, isPreviewLoading: false };
+            const isUnsupportedMkv = (TeleCloud.isAppleDevice() && ext === 'mkv');
+            this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: isMedia, mediaHtml: mediaHtml, isLarge: isLarge, isPreviewLoading: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: isUnsupportedMkv };
             if (playerTarget) {
                 setTimeout(() => {
                     if (this.playerInstance) this.playerInstance.destroy();
@@ -3144,9 +6059,12 @@ function shareApp() {
                         const plyrOpts = { controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'settings'], settings: ['speed'], speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] } };
                         this.playerInstance = new Plyr(playerTarget.el, plyrOpts);
                     } else {
+                        const matchedSubs = findSubtitlesForVideo(file.filename, this.files || [], true, this.shareToken);
                         this.playerInstance = new Artplayer({
                             logger: false,
                             container: playerTarget.el,
+                            lang: this.lang === 'vi' ? 'vi' : 'en',
+                            i18n: artplayerI18n,
                             url: streamUrl,
                             poster: thumbUrl,
                             title: file.filename,
@@ -3170,6 +6088,19 @@ function shareApp() {
                                 'webkit-playsinline': true,
                                 'x5-video-player-type': 'h5-page',
                             },
+                            subtitle: {
+                                url: matchedSubs.length > 0 ? matchedSubs[0].url : '',
+                                type: matchedSubs.length > 0 ? matchedSubs[0].type : 'vtt',
+                                style: {
+                                    color: '#ffffff',
+                                    fontSize: '20px',
+                                    textShadow: '0 0 4px #000, 0 0 4px #000',
+                                },
+                                escape: false,
+                            },
+                            settings: [
+                                buildArtplayerSubtitleSetting(file.filename, this.files || [], true, this.shareToken, (k) => this.t(k))
+                            ],
                             icons: {
                                 loading: '<i class="fa-solid fa-spinner fa-spin text-4xl"></i>',
                                 state: '<i class="fa-solid fa-play text-4xl"></i>',
@@ -3232,16 +6163,22 @@ function shareFileApp() {
         lang: TeleCloud.lang,
         currentTheme: localStorage.getItem('theme') || 'system',
         token: '',
+        id: '',
         filename: '',
         typeKey: '',
         typeExt: '',
         isMedia: false,
         showTextPreviewPrompt: false,
         tooLarge: false,
+        bypassWarning: false,
         isPreviewLoading: false,
+        unsupportedMedia: false,
         textPreviewHtml: '',
         imageViewer: { show: false, src: '', filename: '' },
         lightboxLoading: false,
+        comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false },
+        epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         toastModal: { show: false, message: '', type: 'success', persistent: false },
         toastTimeout: null,
         
@@ -3265,8 +6202,1174 @@ function shareFileApp() {
             this.lightboxLoading = true;
             this.imageViewer = { show: true, src, filename }; 
         },
+        saveComicProgress() {
+            if (this.comicViewer.file && this.comicViewer.file.id) {
+                try {
+                    localStorage.setItem(`comic-page-${this.comicViewer.file.id}`, this.comicViewer.currentPageIndex);
+                } catch(e) {}
+            }
+        },
+        toggleComicScrollMode() {
+            const nextMode = this.comicViewer.scrollMode === 'page' ? 'continuous' : 'page';
+            this.comicViewer.scrollMode = nextMode;
+            if (nextMode === 'continuous') {
+                this.$nextTick(() => {
+                    setTimeout(() => {
+                        const container = document.getElementById('comic-continuous-container') || 
+                                          document.getElementById('share-comic-continuous-container') || 
+                                          document.getElementById('share-folder-comic-continuous-container');
+                        if (container) {
+                            const wrapper = container.querySelector(`.comic-page-wrapper[data-index="${this.comicViewer.currentPageIndex}"]`);
+                            if (wrapper) {
+                                wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                            }
+                        }
+                    }, 100);
+                });
+            } else {
+                this.loadComicPage();
+            }
+        },
+        openComicViewer(file, isShare = false, shareToken = '') {
+            this.comicViewer.show = true;
+            this.comicViewer.file = file;
+            this.comicViewer.pages = [];
+            this.comicViewer.pageUrls = [];
+            
+            let savedPage = 0;
+            if (file && file.id) {
+                try {
+                    const saved = localStorage.getItem(`comic-page-${file.id}`);
+                    if (saved !== null) {
+                        savedPage = parseInt(saved, 10) || 0;
+                    }
+                } catch(e) {}
+            }
+            this.comicViewer.currentPageIndex = savedPage;
+            
+            this.comicViewer.scrollMode = 'page';
+            this.comicViewer.loading = true;
+            this.comicViewer.settingsOpen = false;
+            
+            const hasShareToken = !!(this.shareToken || this.token || shareToken);
+            const token = this.shareToken || this.token || shareToken;
+            
+            const listUrl = hasShareToken 
+                ? `/s/${token}/cbz/list`
+                : `/api/files/${file.id}/cbz/list`;
+
+            fetch(listUrl)
+                .then(res => {
+                    if (!res.ok) throw new Error("Failed to load comic structure");
+                    return res.json();
+                })
+                .then(data => {
+                    if (!this.comicViewer.show || !this.comicViewer.file || String(this.comicViewer.file.id) !== String(file.id) || this.comicViewer.file.filename !== file.filename) return;
+                    this.comicViewer.pages = data.pages || [];
+                    
+                    if (file) {
+                        this.comicViewer.pageUrls = this.comicViewer.pages.map(pagePath => {
+                            return hasShareToken
+                                ? `/s/${token}/cbz/page?path=${encodeURIComponent(pagePath)}`
+                                : `/api/files/${file.id}/cbz/page?path=${encodeURIComponent(pagePath)}`;
+                        });
+                    } else {
+                        this.comicViewer.pageUrls = [];
+                    }
+                    
+                    this.comicViewer.loading = false;
+                    if (this.comicViewer.pages.length > 0) {
+                        if (this.comicViewer.currentPageIndex >= this.comicViewer.pages.length) {
+                            this.comicViewer.currentPageIndex = 0;
+                        }
+                        this.loadComicPage(token);
+                        this.preloadNextComicPage();
+
+                        this.$nextTick(() => {
+                            const container = document.getElementById('comic-continuous-container') || 
+                                              document.getElementById('share-comic-continuous-container') || 
+                                              document.getElementById('share-folder-comic-continuous-container');
+                            if (container) {
+                                container.onscroll = () => {
+                                    if (this.comicViewer.scrollMode !== 'continuous') return;
+                                    const wrappers = container.querySelectorAll('.comic-page-wrapper');
+                                    let activeIndex = 0;
+                                    let minDiff = Infinity;
+                                    wrappers.forEach((wrapper, idx) => {
+                                        const rect = wrapper.getBoundingClientRect();
+                                        const diff = Math.abs(rect.top);
+                                        if (diff < minDiff) {
+                                            minDiff = diff;
+                                            activeIndex = idx;
+                                        }
+                                    });
+                                    if (activeIndex !== this.comicViewer.currentPageIndex && activeIndex >= 0 && activeIndex < this.comicViewer.pages.length) {
+                                        this.comicViewer.currentPageIndex = activeIndex;
+                                        this.saveComicProgress();
+                                    }
+                                };
+                            }
+
+                            setTimeout(() => {
+                                if (this.comicViewer.scrollMode === 'continuous') {
+                                    if (container) {
+                                        const wrapper = container.querySelector(`.comic-page-wrapper[data-index="${this.comicViewer.currentPageIndex}"]`);
+                                        if (wrapper) {
+                                            wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                                        }
+                                    }
+                                }
+                            }, 400);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    this.showToast(this.t('err_loading_comic'), 'error');
+                    this.comicViewer.show = false;
+                    this.comicViewer.loading = false;
+                });
+        },
+        loadComicPage(tokenOpt) {
+            if (this.comicViewer.currentPageIndex < 0 || this.comicViewer.currentPageIndex >= this.comicViewer.pages.length) return;
+            const file = this.comicViewer.file;
+            if (!file) return;
+            
+            const pageUrl = this.comicViewer.pageUrls[this.comicViewer.currentPageIndex];
+            if (!pageUrl) return;
+            
+            this.comicViewer.pageLoading = true;
+            
+            const img = new Image();
+            img.onload = () => {
+                this.comicViewer.pageLoading = false;
+            };
+            img.onerror = () => {
+                this.comicViewer.pageLoading = false;
+            };
+            img.src = pageUrl;
+        },
+        nextComicPage() {
+            if (this.comicViewer.currentPageIndex < this.comicViewer.pages.length - 1) {
+                this.comicViewer.currentPageIndex++;
+                this.loadComicPage();
+                this.preloadNextComicPage();
+                this.saveComicProgress();
+            }
+        },
+        prevComicPage() {
+            if (this.comicViewer.currentPageIndex > 0) {
+                this.comicViewer.currentPageIndex--;
+                this.loadComicPage();
+                this.saveComicProgress();
+            }
+        },
+        preloadNextComicPage() {
+            const nextIndex = this.comicViewer.currentPageIndex + 1;
+            if (nextIndex < this.comicViewer.pages.length) {
+                const file = this.comicViewer.file;
+                if (!file) return;
+                
+                const pageUrl = this.comicViewer.pageUrls[nextIndex];
+                if (!pageUrl) return;
+                
+                const img = new Image();
+                img.src = pageUrl;
+            }
+        },
+        closeComicViewer() {
+            if (window._comicAutoScrollRaf) {
+                cancelAnimationFrame(window._comicAutoScrollRaf);
+                window._comicAutoScrollRaf = null;
+            }
+            if (window._comicIntersectionObserver) {
+                window._comicIntersectionObserver.disconnect();
+                window._comicIntersectionObserver = null;
+            }
+            this.comicViewer.show = false;
+            this.comicViewer.autoScrollActive = false;
+            const urls = this.comicViewer.pageUrls ? [...this.comicViewer.pageUrls] : [];
+            setTimeout(() => {
+                if (this.comicViewer.show) return; // viewer was reopened — leave state alone
+                const pageImg = document.getElementById('comic-viewer-img') || document.getElementById('comic-viewer-img-file') || document.getElementById('comic-viewer-img-folder');
+                if (pageImg) pageImg.removeAttribute('src');
+                this.comicViewer.file = null;
+                this.comicViewer.pages = [];
+                this.comicViewer.pageUrls = [];
+                this.comicViewer.settingsOpen = false;
+                urls.forEach(u => { if (u && u.startsWith('blob:')) try { URL.revokeObjectURL(u); } catch(e) {} });
+            }, 400);
+        },
+        toggleComicAutoScroll() {
+            this.comicViewer.autoScrollActive = !this.comicViewer.autoScrollActive;
+            if (this.comicViewer.autoScrollActive) {
+                this.startComicAutoScroll();
+            } else {
+                this.stopComicAutoScroll();
+            }
+        },
+        startComicAutoScroll() {
+            if (window._comicAutoScrollRaf) {
+                cancelAnimationFrame(window._comicAutoScrollRaf);
+            }
+            const scrollLoop = () => {
+                if (!this.comicViewer.show || !this.comicViewer.autoScrollActive) {
+                    this.comicViewer.autoScrollActive = false;
+                    if (window._comicAutoScrollRaf) {
+                        cancelAnimationFrame(window._comicAutoScrollRaf);
+                        window._comicAutoScrollRaf = null;
+                    }
+                    return;
+                }
+                try {
+                    const container = document.getElementById('comic-continuous-container') || 
+                                      document.getElementById('share-comic-continuous-container') || 
+                                      document.getElementById('share-folder-comic-continuous-container');
+                    if (container) {
+                        container.scrollTop += Math.pow(this.comicViewer.autoScrollSpeed, 2) * 0.25;
+                    } else {
+                        this.stopComicAutoScroll();
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Comic auto-scroll error:", e);
+                    this.stopComicAutoScroll();
+                    return;
+                }
+                window._comicAutoScrollRaf = requestAnimationFrame(scrollLoop);
+            };
+            window._comicAutoScrollRaf = requestAnimationFrame(scrollLoop);
+        },
+        stopComicAutoScroll() {
+            this.comicViewer.autoScrollActive = false;
+            if (window._comicAutoScrollRaf) {
+                cancelAnimationFrame(window._comicAutoScrollRaf);
+                window._comicAutoScrollRaf = null;
+            }
+        },
+        changeComicAutoScrollSpeed(amount) {
+            this.comicViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.comicViewer.autoScrollSpeed + amount));
+        },
+        openEpubViewer(file, isShare = false, shareToken = '') {
+            this._transitioningChapter = false;
+            this.epubViewer.show = true;
+            this.epubViewer.file = file;
+            this.epubViewer.loading = true;
+            this.epubViewer.toc = [];
+            this.epubViewer.sidebarOpen = false;
+            this.epubViewer.fontSize = 100;
+            this.epubViewer.pageProgress = 0;
+            this.epubViewer.spine = [];
+            this.epubViewer.currentChapter = 0;
+            this.epubViewer.title = '';
+            this.epubViewer.settingsOpen = false;
+            
+            const token = this.shareToken || this.token || shareToken || '';
+            const hasShareToken = !!token;
+            
+            const metaUrl = hasShareToken
+                ? `/s/${token}/epub/meta`
+                : `/api/files/${file.id}/epub/meta`;
+            
+            const resourceBaseUrl = hasShareToken
+                ? `/s/${token}/epub/resource`
+                : `/api/files/${file.id}/epub/resource`;
+            
+            this.epubViewer.resourceBaseUrl = resourceBaseUrl;
+
+            // Clean up previous
+            if (window._epubBook) {
+                try { window._epubBook.destroy(); } catch(e) {}
+                window._epubBook = null;
+                window._epubRendition = null;
+            }
+
+            this.$nextTick(() => {
+                const area = document.getElementById('epub-viewer-area');
+                if (area) area.innerHTML = '<iframe id="epub-iframe" class="w-full h-full border-0" sandbox="allow-same-origin" style="background:#fff"></iframe>';
+                
+                (async () => {
+                    try {
+                        const res = await fetch(metaUrl, { credentials: 'same-origin' });
+                        if (!res.ok) throw new Error('meta_fetch_failed');
+                        const meta = await res.json();
+                        
+                        if (!this.epubViewer.show || !this.epubViewer.file || String(this.epubViewer.file.id) !== String(file.id) || this.epubViewer.file.filename !== file.filename) return;
+                        
+                        // Flatten TOC recursively and add indent levels + unique ids
+                        const flattenToc = (items, level = 0) => {
+                            let result = [];
+                            items.forEach((item, idx) => {
+                                result.push({
+                                    id: `toc-${level}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
+                                    label: item.label,
+                                    href: item.href,
+                                    level: level
+                                });
+                                if (item.children && item.children.length > 0) {
+                                    result = result.concat(flattenToc(item.children, level + 1));
+                                }
+                            });
+                            return result;
+                        };
+                        this.epubViewer.toc = flattenToc(meta.toc || []);
+                        this.epubViewer.spine = meta.spine || [];
+                        this.epubViewer.title = meta.title || file.filename;
+                        
+                        // Restore reading position
+                        const savedChapter = file.id ? parseInt(localStorage.getItem(`epub-ch-${file.id}`) || '0') : 0;
+                        this.epubViewer.currentChapter = Math.max(0, Math.min(savedChapter, this.epubViewer.spine.length - 1));
+                        
+                        this._loadEpubChapter(file);
+                    } catch (err) {
+                        console.error('EPUB meta failed:', err);
+                        if (this.epubViewer.file && String(this.epubViewer.file.id) === String(file.id) && this.epubViewer.file.filename === file.filename) {
+                            this.showToast(this.t('err_loading_epub'), 'error');
+                            this.epubViewer.show = false;
+                            this.epubViewer.loading = false;
+                        }
+                    }
+                })();
+            });
+        },
+        _normalizePath(p) {
+            if (!p) return '';
+            try { p = decodeURIComponent(p); } catch(e) {}
+            p = p.replace(/\\/g, '/'); // normalize backslashes
+            if (p.startsWith('./')) p = p.substring(2);
+            p = p.replace(/\/+/g, '/');
+            return p.trim();
+        },
+        _resolveRelativePath(base, relative) {
+            if (relative.startsWith('/')) return relative.substring(1);
+            if (relative.includes('://')) return relative;
+            
+            const baseParts = base.split('/');
+            baseParts.pop(); // remove filename
+            
+            const relParts = relative.split('/');
+            for (const part of relParts) {
+                if (part === '.' || part === '') {
+                    continue;
+                } else if (part === '..') {
+                    if (baseParts.length > 0) baseParts.pop();
+                } else {
+                    baseParts.push(part);
+                }
+            }
+            return baseParts.join('/');
+        },
+        _loadEpubChapter(file, startAtBottom = false) {
+            const chapter = this.epubViewer.spine[this.epubViewer.currentChapter];
+            if (!chapter) return;
+            
+            this.epubViewer.loading = true;
+            const iframe = document.getElementById('epub-iframe');
+            if (!iframe) return;
+            
+            iframe.onload = () => {
+                if (!this.epubViewer.show || !this.epubViewer.file || String(this.epubViewer.file.id) !== String(file.id) || this.epubViewer.file.filename !== file.filename) return;
+                this.epubViewer.loading = false;
+                this._transitioningChapter = false;
+                this.applyEpubTheme();
+                
+                const win = iframe.contentWindow;
+                const doc = iframe.contentDocument;
+                
+                // Intercept links inside the iframe
+                doc.querySelectorAll('a').forEach(a => {
+                    a.addEventListener('click', (e) => {
+                        const href = a.getAttribute('href');
+                        if (!href) return;
+                        
+                        if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+                            e.preventDefault();
+                            window.open(href, '_blank');
+                            return;
+                        }
+                        
+                        e.preventDefault();
+                        const currentChapter = this.epubViewer.spine[this.epubViewer.currentChapter];
+                        if (currentChapter) {
+                            const resolvedHref = this._resolveRelativePath(currentChapter.href, href);
+                            this.navigateToCfi(resolvedHref);
+                        }
+                    });
+                });
+
+                // Restore/set scroll position
+                if (startAtBottom) {
+                    try { win.scrollTo(0, doc.documentElement.scrollHeight || doc.body.scrollHeight || 999999); } catch(e) {}
+                } else {
+                    const savedScroll = file.id ? localStorage.getItem(`epub-scroll-${file.id}`) : null;
+                    if (savedScroll) {
+                        try { win.scrollTo(0, parseInt(savedScroll)); } catch(e) {}
+                        localStorage.removeItem(`epub-scroll-${file.id}`);
+                    } else {
+                        win.scrollTo(0, 0);
+                    }
+                }
+                
+                // Add scroll listener inside the iframe to save progress and auto-navigate chapters
+                let lastScrollTime = 0;
+                let lastScrollTop = win.scrollY || doc.documentElement.scrollTop || 0;
+                
+                win.addEventListener('scroll', () => {
+                    const scrollTop = win.scrollY || doc.documentElement.scrollTop || 0;
+                    const scrollHeight = doc.documentElement.scrollHeight || doc.body.scrollHeight || 0;
+                    const clientHeight = doc.documentElement.clientHeight || win.innerHeight || 0;
+                    
+                    const isScrollingUp = scrollTop < lastScrollTop;
+                    lastScrollTop = scrollTop;
+                    
+                    // Throttle progress saving
+                    const now = Date.now();
+                    if (now - lastScrollTime > 1000) {
+                        this._saveEpubScroll();
+                        lastScrollTime = now;
+                    }
+                });
+
+
+            };
+            
+            iframe.src = `${this.epubViewer.resourceBaseUrl}/${chapter.href}`;
+            
+            // Save reading position
+            if (file.id) {
+                try { localStorage.setItem(`epub-ch-${file.id}`, this.epubViewer.currentChapter); } catch(e) {}
+            }
+            
+            // Update progress
+            if (this.epubViewer.spine.length > 0) {
+                this.epubViewer.pageProgress = Math.round(((this.epubViewer.currentChapter + 1) / this.epubViewer.spine.length) * 100);
+            }
+        },
+        nextEpubChapter() {
+            if (this.epubViewer.currentChapter < this.epubViewer.spine.length - 1) {
+                this._saveEpubScroll();
+                this.epubViewer.currentChapter++;
+                this._loadEpubChapter(this.epubViewer.file, false);
+            }
+        },
+        prevEpubChapter(startAtBottom = false) {
+            if (this.epubViewer.currentChapter > 0) {
+                this._saveEpubScroll();
+                this.epubViewer.currentChapter--;
+                this._loadEpubChapter(this.epubViewer.file, startAtBottom);
+            }
+        },
+        _saveEpubScroll() {
+            const iframe = document.getElementById('epub-iframe');
+            if (iframe && iframe.contentWindow && this.epubViewer.file && this.epubViewer.file.id) {
+                try { localStorage.setItem(`epub-scroll-${this.epubViewer.file.id}`, iframe.contentWindow.scrollY || iframe.contentDocument.documentElement.scrollTop || 0); } catch(e) {}
+            }
+        },
+        navigateToCfi(href) {
+            const fullHref = typeof href === 'string' ? href : (href && href.href ? href.href : '');
+            const parts = fullHref.split('#');
+            const rawBaseHref = parts[0];
+            const fragment = parts[1] || '';
+            
+            const baseHref = this._normalizePath(rawBaseHref);
+            
+            const idx = this.epubViewer.spine.findIndex(s => {
+                const spineHref = this._normalizePath(s.href);
+                return spineHref === baseHref || spineHref.endsWith('/' + baseHref) || baseHref.endsWith('/' + spineHref);
+            });
+            
+            if (idx >= 0) {
+                this.epubViewer.currentChapter = idx;
+                this._loadEpubChapter(this.epubViewer.file, false);
+                if (fragment) {
+                    setTimeout(() => {
+                        const iframe = document.getElementById('epub-iframe');
+                        if (iframe && iframe.contentDocument) {
+                            let el = iframe.contentDocument.getElementById(fragment);
+                            if (!el) {
+                                const els = iframe.contentDocument.getElementsByName(fragment);
+                                if (els && els.length > 0) el = els[0];
+                            }
+                            if (el) el.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }, 500);
+                }
+            }
+            this.epubViewer.sidebarOpen = false;
+        },
+        applyEpubTheme() {
+            const iframe = document.getElementById('epub-iframe');
+            if (!iframe || !iframe.contentDocument) return;
+            
+            const doc = iframe.contentDocument;
+            const win = iframe.contentWindow;
+            const isDark = document.documentElement.classList.contains('dark');
+            const bg = isDark ? '#1e293b' : '#ffffff';
+            const fg = isDark ? '#f1f5f9' : '#0f172a';
+            
+            let style = doc.getElementById('tc-epub-theme');
+            if (!style) {
+                style = doc.createElement('style');
+                style.id = 'tc-epub-theme';
+                doc.head.appendChild(style);
+            }
+            style.textContent = `
+                body { background: ${bg} !important; color: ${fg} !important; font-size: ${this.epubViewer.fontSize}% !important; line-height: 1.6 !important; padding: 20px !important; max-width: 800px !important; margin: 0 auto !important; font-family: Inter, system-ui, -apple-system, sans-serif !important; }
+                p, span, div, li, td, th, h1, h2, h3, h4, h5, h6 { color: ${fg} !important; }
+                a { color: #3b82f6 !important; }
+                img, svg { max-width: 100% !important; height: auto !important; }
+                
+                /* Custom slim scrollbar inside iframe */
+                ::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+                ::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                ::-webkit-scrollbar-thumb {
+                    background: ${isDark ? '#475569' : '#cbd5e1'};
+                    border-radius: 4px;
+                }
+                ::-webkit-scrollbar-thumb:hover {
+                    background: ${isDark ? '#64748b' : '#94a3b8'};
+                }
+            `;
+        },
+        changeEpubFontSize(delta) {
+            this.epubViewer.fontSize = Math.max(50, Math.min(250, this.epubViewer.fontSize + delta));
+            this.applyEpubTheme();
+        },
+        nextEpubPage() { this.nextEpubChapter(); },
+        prevEpubPage() { this.prevEpubChapter(); },
+        closeEpubViewer() {
+            if (window._epubAutoScrollRaf) {
+                cancelAnimationFrame(window._epubAutoScrollRaf);
+                window._epubAutoScrollRaf = null;
+            }
+            this._transitioningChapter = false;
+            try { this._saveEpubScroll(); } catch(e) {}
+            this.epubViewer.show = false;
+            this.epubViewer.autoScrollActive = false;
+            setTimeout(() => {
+                const iframe = document.getElementById('epub-iframe');
+                if (iframe) { iframe.onload = null; iframe.src = 'about:blank'; }
+                if (window._epubBook) {
+                    try { window._epubBook.destroy(); } catch(e) {}
+                    window._epubBook = null;
+                    window._epubRendition = null;
+                }
+                const area = document.getElementById('epub-viewer-area');
+                if (area) area.innerHTML = '';
+                this.epubViewer.file = null;
+                this.epubViewer.toc = [];
+                this.epubViewer.spine = [];
+                this.epubViewer.settingsOpen = false;
+            }, 400);
+        },
+        toggleEpubAutoScroll() {
+            this.epubViewer.autoScrollActive = !this.epubViewer.autoScrollActive;
+            if (this.epubViewer.autoScrollActive) {
+                this.startEpubAutoScroll();
+            } else {
+                this.stopEpubAutoScroll();
+            }
+        },
+        startEpubAutoScroll() {
+            if (window._epubAutoScrollRaf) cancelAnimationFrame(window._epubAutoScrollRaf);
+            const scrollLoop = () => {
+                if (!this.epubViewer.show || !this.epubViewer.autoScrollActive) {
+                    this.epubViewer.autoScrollActive = false;
+                    if (window._epubAutoScrollRaf) {
+                        cancelAnimationFrame(window._epubAutoScrollRaf);
+                        window._epubAutoScrollRaf = null;
+                    }
+                    return;
+                }
+                // Skip scrolling while chapter is transitioning to avoid accessing a reloading iframe
+                if (this._transitioningChapter) {
+                    window._epubAutoScrollRaf = requestAnimationFrame(scrollLoop);
+                    return;
+                }
+                try {
+                    const iframe = document.getElementById('epub-iframe');
+                    if (iframe && iframe.contentWindow && iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+                        iframe.contentWindow.scrollBy(0, Math.pow(this.epubViewer.autoScrollSpeed, 2) * 0.25);
+                    } else if (!iframe) {
+                        this.stopEpubAutoScroll();
+                        return;
+                    }
+                    // If iframe exists but not ready, just skip this frame
+                } catch (e) {
+                    // Silently skip - iframe may be reloading during chapter transition
+                    if (!this.epubViewer.show) {
+                        this.stopEpubAutoScroll();
+                        return;
+                    }
+                }
+                window._epubAutoScrollRaf = requestAnimationFrame(scrollLoop);
+            };
+            window._epubAutoScrollRaf = requestAnimationFrame(scrollLoop);
+        },
+        stopEpubAutoScroll() {
+            this.epubViewer.autoScrollActive = false;
+            if (window._epubAutoScrollRaf) {
+                cancelAnimationFrame(window._epubAutoScrollRaf);
+                window._epubAutoScrollRaf = null;
+            }
+        },
+        changeEpubAutoScrollSpeed(amount) {
+            this.epubViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.epubViewer.autoScrollSpeed + amount));
+        },
+        openPdfViewer(file, isShare = false, shareToken = '') {
+            this.pdfViewer.show = true;
+            this.pdfViewer.file = file;
+            this.pdfViewer.loading = true;
+            this.pdfViewer.pageLoading = true;
+            this.pdfViewer.sidebarOpen = false;
+            this.pdfViewer.zoom = 'width';
+            this.pdfViewer.pageProgress = 0;
+            this.pdfViewer.currentPage = 1;
+            this.pdfViewer.numPages = 0;
+            this.pdfViewer.settingsOpen = false;
+            this.pdfViewer.toc = [];
+            this.pdfViewer.autoScrollActive = false;
+            this.pdfViewer.autoScrollSpeed = 2;
+            
+            const isDarkGlobal = document.documentElement.classList.contains('dark');
+            this.pdfViewer.darkModeFilter = isDarkGlobal;
+
+            const token = this.shareToken || this.token || shareToken || '';
+            const hasShareToken = !!token;
+            
+            let downloadUrl;
+            if (hasShareToken) {
+                downloadUrl = `/s/${token}/stream`;
+            } else {
+                downloadUrl = `/download/${file.id}`;
+            }
+
+            if (window._pdfLoadingTask) {
+                try { window._pdfLoadingTask.destroy(); } catch(e) {}
+                window._pdfLoadingTask = null;
+            }
+            if (window._pdfRenderTask) {
+                try { window._pdfRenderTask.cancel(); } catch(e) {}
+                window._pdfRenderTask = null;
+            }
+            window._pdfDoc = null;
+
+            if (window._pdfResizeHandler) {
+                window.removeEventListener('resize', window._pdfResizeHandler);
+            }
+            window._pdfResizeHandler = () => {
+                if (this.pdfViewer.show && (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height')) {
+                    if (window._pdfResizeTimeout) clearTimeout(window._pdfResizeTimeout);
+                    window._pdfResizeTimeout = setTimeout(() => {
+                        if (this.pdfViewer.scrollMode === 'continuous') {
+                            const container = document.getElementById('pdf-continuous-container') || 
+                                              document.getElementById('share-pdf-continuous-container') || 
+                                              document.getElementById('share-folder-pdf-continuous-container');
+                            if (container) {
+                                const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                                const containerRect = container.getBoundingClientRect();
+                                wrappers.forEach(wrapper => {
+                                    const canvas = wrapper.querySelector('canvas');
+                                    if (canvas) canvas.removeAttribute('data-rendered');
+                                    const rect = wrapper.getBoundingClientRect();
+                                    if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                                        const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                                        this.renderPdfContinuousPage(pageNum);
+                                    }
+                                });
+                            }
+                        } else {
+                            this.renderPdfPage(this.pdfViewer.currentPage);
+                        }
+                    }, 150);
+                }
+            };
+            window.addEventListener('resize', window._pdfResizeHandler);
+
+            this.$nextTick(async () => {
+                try {
+                    const loadingTask = pdfjsLib.getDocument({ url: downloadUrl, withCredentials: true });
+                    window._pdfLoadingTask = loadingTask;
+                    
+                    const pdfDoc = await loadingTask.promise;
+                    if (!this.pdfViewer.show || !this.pdfViewer.file || String(this.pdfViewer.file.id || '') !== String(file.id || '') || this.pdfViewer.file.filename !== file.filename) {
+                        return;
+                    }
+                    
+                    window._pdfDoc = pdfDoc;
+                    this.pdfViewer.numPages = pdfDoc.numPages;
+                    this.pdfViewer.loading = false;
+
+                    try {
+                        const outline = await pdfDoc.getOutline();
+                        if (outline && outline.length > 0) {
+                            const resolveOutline = async (items) => {
+                                const result = [];
+                                for (const item of items) {
+                                    let pageNumber = null;
+                                    if (item.dest) {
+                                        try {
+                                            let dest = item.dest;
+                                            if (typeof dest === 'string') {
+                                                dest = await pdfDoc.getDestination(dest);
+                                            }
+                                            if (dest && Array.isArray(dest)) {
+                                                const pageRef = dest[0];
+                                                const pageIndex = await pdfDoc.getPageIndex(pageRef);
+                                                pageNumber = pageIndex + 1;
+                                            }
+                                        } catch (e) {
+                                            console.error("Outline dest resolution error:", e);
+                                        }
+                                    }
+                                    const node = { title: item.title, page: pageNumber };
+                                    if (item.items && item.items.length > 0) {
+                                        node.children = await resolveOutline(item.items);
+                                    }
+                                    result.push(node);
+                                }
+                                return result;
+                            };
+                            const resolved = await resolveOutline(outline);
+                            const flatten = (nodes, depth = 0) => {
+                                let list = [];
+                                nodes.forEach(n => {
+                                    list.push({ title: n.title, page: n.page, depth });
+                                    if (n.children) {
+                                        list = list.concat(flatten(n.children, depth + 1));
+                                    }
+                                });
+                                return list;
+                            };
+                            this.pdfViewer.toc = flatten(resolved);
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse outline:", e);
+                    }
+
+                    let startPage = 1;
+                    if (file && file.id) {
+                        const saved = localStorage.getItem(`pdf-page-${file.id}`);
+                        if (saved) {
+                            const p = parseInt(saved);
+                            if (p >= 1 && p <= pdfDoc.numPages) {
+                                startPage = p;
+                            }
+                        }
+                        const savedMode = localStorage.getItem(`pdf-scroll-mode-${file.id}`);
+                        if (savedMode) {
+                            this.pdfViewer.scrollMode = savedMode;
+                        } else {
+                            this.pdfViewer.scrollMode = 'page';
+                        }
+                    } else {
+                        this.pdfViewer.scrollMode = 'page';
+                    }
+                    this.pdfViewer.currentPage = startPage;
+                    this.pdfViewer.pageProgress = Math.round((startPage / pdfDoc.numPages) * 100);
+                    if (this.pdfViewer.scrollMode === 'continuous') {
+                        this.$nextTick(() => {
+                            setTimeout(() => {
+                                const container = document.getElementById('pdf-continuous-container') || 
+                                                  document.getElementById('share-pdf-continuous-container') || 
+                                                  document.getElementById('share-folder-pdf-continuous-container');
+                                if (container) {
+                                    const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${startPage}"]`);
+                                    if (wrapper) {
+                                        wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                                    }
+                                }
+                            }, 300);
+                        });
+                    } else {
+                        this.renderPdfPage(startPage);
+                    }
+
+                } catch (err) {
+                    console.error("PDF.js initialization failed:", err);
+                    this.showToast(this.t('err_loading_pdf'), 'error');
+                    this.pdfViewer.show = false;
+                    this.pdfViewer.loading = false;
+                    this.pdfViewer.pageLoading = false;
+                }
+            });
+        },
+        renderPdfPage(pageNumber) {
+            if (!window._pdfDoc) return;
+            if (pageNumber < 1 || pageNumber > this.pdfViewer.numPages) return;
+            
+            this.pdfViewer.pageLoading = true;
+            this.pdfViewer.currentPage = pageNumber;
+            
+            if (this.pdfViewer.file && this.pdfViewer.file.id) {
+                try { localStorage.setItem(`pdf-page-${this.pdfViewer.file.id}`, pageNumber); } catch(e) {}
+            }
+            
+            this.pdfViewer.pageProgress = Math.round((pageNumber / this.pdfViewer.numPages) * 100);
+            
+            if (window._pdfRenderTask) {
+                try { window._pdfRenderTask.cancel(); } catch(e) {}
+                window._pdfRenderTask = null;
+            }
+            
+            window._pdfDoc.getPage(pageNumber).then(page => {
+                const canvas = document.getElementById('pdf-canvas');
+                if (!canvas) {
+                    this.pdfViewer.pageLoading = false;
+                    return;
+                }
+                
+                const context = canvas.getContext('2d');
+                const container = document.getElementById('pdf-viewer-area');
+                if (!container) {
+                    this.pdfViewer.pageLoading = false;
+                    return;
+                }
+                
+                let scale = 1.0;
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                
+                if (this.pdfViewer.zoom === 'width') {
+                    scale = (container.clientWidth - 32) / unscaledViewport.width;
+                } else if (this.pdfViewer.zoom === 'height') {
+                    scale = (container.clientHeight - 32) / unscaledViewport.height;
+                } else {
+                    scale = (parseInt(this.pdfViewer.zoom) || 100) / 100;
+                }
+                
+                const outputScale = window.devicePixelRatio || 1;
+                const viewport = page.getViewport({ scale: scale });
+                
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + "px";
+                canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                const transform = outputScale !== 1
+                    ? [outputScale, 0, 0, outputScale, 0, 0]
+                    : null;
+                
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport,
+                    transform: transform
+                };
+                
+                const renderTask = page.render(renderContext);
+                window._pdfRenderTask = renderTask;
+                
+                renderTask.promise.then(() => {
+                    this.pdfViewer.pageLoading = false;
+                    window._pdfRenderTask = null;
+                }).catch(err => {
+                    if (err.name === 'RenderingCancelledException') return;
+                    console.error("PDF page rendering error:", err);
+                    this.pdfViewer.pageLoading = false;
+                });
+            }).catch(err => {
+                console.error("Failed to render PDF page:", err);
+                this.pdfViewer.pageLoading = false;
+            });
+        },
+        pdfZoomIn() {
+            if (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height') {
+                this.pdfViewer.zoom = 100;
+            } else {
+                this.pdfViewer.zoom = Math.min(300, this.pdfViewer.zoom + 25);
+            }
+            if (this.pdfViewer.scrollMode === 'continuous') {
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (container) {
+                    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                    const containerRect = container.getBoundingClientRect();
+                    wrappers.forEach(wrapper => {
+                        const canvas = wrapper.querySelector('canvas');
+                        if (canvas) canvas.removeAttribute('data-rendered');
+                        const rect = wrapper.getBoundingClientRect();
+                        if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                            const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                            this.renderPdfContinuousPage(pageNum);
+                        }
+                    });
+                }
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        pdfZoomOut() {
+            if (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height') {
+                this.pdfViewer.zoom = 100;
+            } else {
+                this.pdfViewer.zoom = Math.max(50, this.pdfViewer.zoom - 25);
+            }
+            if (this.pdfViewer.scrollMode === 'continuous') {
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (container) {
+                    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                    const containerRect = container.getBoundingClientRect();
+                    wrappers.forEach(wrapper => {
+                        const canvas = wrapper.querySelector('canvas');
+                        if (canvas) canvas.removeAttribute('data-rendered');
+                        const rect = wrapper.getBoundingClientRect();
+                        if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                            const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                            this.renderPdfContinuousPage(pageNum);
+                        }
+                    });
+                }
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        pdfSetZoom(val) {
+            this.pdfViewer.zoom = val;
+            if (this.pdfViewer.scrollMode === 'continuous') {
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (container) {
+                    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+                    const containerRect = container.getBoundingClientRect();
+                    wrappers.forEach(wrapper => {
+                        const canvas = wrapper.querySelector('canvas');
+                        if (canvas) canvas.removeAttribute('data-rendered');
+                        const rect = wrapper.getBoundingClientRect();
+                        if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
+                            const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
+                            this.renderPdfContinuousPage(pageNum);
+                        }
+                    });
+                }
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        pdfNextPage() {
+            if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
+                this.renderPdfPage(this.pdfViewer.currentPage + 1);
+                this.$nextTick(() => {
+                    const area = document.getElementById('pdf-viewer-area');
+                    if (area) area.scrollTop = 0;
+                });
+            }
+        },
+        pdfPrevPage() {
+            if (this.pdfViewer.currentPage > 1) {
+                this.renderPdfPage(this.pdfViewer.currentPage - 1);
+                this.$nextTick(() => {
+                    const area = document.getElementById('pdf-viewer-area');
+                    if (area) area.scrollTop = 0;
+                });
+            }
+        },
+        pdfJumpToPage(page) {
+            const p = parseInt(page);
+            if (p >= 1 && p <= this.pdfViewer.numPages) {
+                this.renderPdfPage(p);
+                this.$nextTick(() => {
+                    const area = document.getElementById('pdf-viewer-area');
+                    if (area) area.scrollTop = 0;
+                });
+            }
+        },
+        closePdfViewer() {
+            if (window._pdfIntersectionObserver) {
+                window._pdfIntersectionObserver.disconnect();
+                window._pdfIntersectionObserver = null;
+            }
+            if (window._pdfAutoScrollRaf) {
+                cancelAnimationFrame(window._pdfAutoScrollRaf);
+                window._pdfAutoScrollRaf = null;
+            }
+            this.pdfViewer.show = false;
+            this.pdfViewer.autoScrollActive = false;
+            
+            if (window._pdfResizeHandler) {
+                window.removeEventListener('resize', window._pdfResizeHandler);
+                window._pdfResizeHandler = null;
+            }
+            setTimeout(() => {
+                if (window._pdfLoadingTask) {
+                    try { window._pdfLoadingTask.destroy(); } catch(e) {}
+                    window._pdfLoadingTask = null;
+                }
+                if (window._pdfRenderTask) {
+                    try { window._pdfRenderTask.cancel(); } catch(e) {}
+                    window._pdfRenderTask = null;
+                }
+                window._pdfDoc = null;
+                const canvas = document.getElementById('pdf-canvas');
+                if (canvas) {
+                    const context = canvas.getContext('2d');
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                }
+                this.pdfViewer.file = null;
+                this.pdfViewer.toc = [];
+                this.pdfViewer.settingsOpen = false;
+            }, 400);
+        },
+        togglePdfAutoScroll() {
+            this.pdfViewer.autoScrollActive = !this.pdfViewer.autoScrollActive;
+            if (this.pdfViewer.autoScrollActive) {
+                this.startPdfAutoScroll();
+            } else {
+                this.stopPdfAutoScroll();
+            }
+        },
+        startPdfAutoScroll() {
+            if (window._pdfAutoScrollRaf) cancelAnimationFrame(window._pdfAutoScrollRaf);
+            const scrollLoop = () => {
+                if (!this.pdfViewer.show || !this.pdfViewer.autoScrollActive) {
+                    this.pdfViewer.autoScrollActive = false;
+                    if (window._pdfAutoScrollRaf) {
+                        cancelAnimationFrame(window._pdfAutoScrollRaf);
+                        window._pdfAutoScrollRaf = null;
+                    }
+                    return;
+                }
+                try {
+                    const container = document.getElementById('pdf-viewer-area');
+                    if (container) {
+                        container.scrollBy(0, Math.pow(this.pdfViewer.autoScrollSpeed, 2) * 0.25);
+                        if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
+                            if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
+                                this.pdfNextPage();
+                                container.scrollTop = 0;
+                            } else {
+                                this.stopPdfAutoScroll();
+                                return;
+                            }
+                        }
+                    } else {
+                        this.stopPdfAutoScroll();
+                        return;
+                    }
+                } catch (e) {
+                    if (!this.pdfViewer.show) {
+                        this.stopPdfAutoScroll();
+                        return;
+                    }
+                }
+                window._pdfAutoScrollRaf = requestAnimationFrame(scrollLoop);
+            };
+            window._pdfAutoScrollRaf = requestAnimationFrame(scrollLoop);
+        },
+        stopPdfAutoScroll() {
+            this.pdfViewer.autoScrollActive = false;
+            if (window._pdfAutoScrollRaf) {
+                cancelAnimationFrame(window._pdfAutoScrollRaf);
+                window._pdfAutoScrollRaf = null;
+            }
+        },
+        changePdfAutoScrollSpeed(amount) {
+            this.pdfViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.pdfViewer.autoScrollSpeed + amount));
+        },
+        renderPdfContinuousPage(pageNum) {
+            if (!window._pdfDoc) return;
+            const canvas = document.getElementById(`pdf-canvas-${pageNum}`);
+            if (!canvas || canvas.getAttribute('data-rendered') === 'true') return;
+            
+            window._pdfDoc.getPage(pageNum).then(page => {
+                const context = canvas.getContext('2d');
+                const container = document.getElementById('pdf-continuous-container') || 
+                                  document.getElementById('share-pdf-continuous-container') || 
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                if (!container) return;
+                
+                let scale = 1.0;
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                
+                if (this.pdfViewer.zoom === 'width') {
+                    scale = (container.clientWidth - 32) / unscaledViewport.width;
+                } else if (this.pdfViewer.zoom === 'height') {
+                    scale = (container.clientHeight - 32) / unscaledViewport.height;
+                } else {
+                    scale = (parseInt(this.pdfViewer.zoom) || 100) / 100;
+                }
+                
+                const outputScale = window.devicePixelRatio || 1;
+                const viewport = page.getViewport({ scale: scale });
+                
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + "px";
+                canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport,
+                    transform: transform
+                };
+                
+                page.render(renderContext).promise.then(() => {
+                    canvas.setAttribute('data-rendered', 'true');
+                });
+            });
+        },
+        trackPdfContinuousScroll(container) {
+            if (this.pdfViewer.scrollMode !== 'continuous') return;
+            const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+            let activePage = 1;
+            let minDiff = Infinity;
+            const containerTop = container.getBoundingClientRect().top;
+            wrappers.forEach((wrapper) => {
+                const rect = wrapper.getBoundingClientRect();
+                const diff = Math.abs(rect.top - containerTop);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    activePage = parseInt(wrapper.getAttribute('data-page'), 10);
+                }
+            });
+            if (activePage !== this.pdfViewer.currentPage) {
+                this.pdfViewer.currentPage = activePage;
+                this.pdfViewer.pageProgress = Math.round((activePage / this.pdfViewer.numPages) * 100);
+                if (this.pdfViewer.file && this.pdfViewer.file.id) {
+                    try { localStorage.setItem(`pdf-page-${this.pdfViewer.file.id}`, activePage); } catch(e) {}
+                }
+            }
+        },
+        togglePdfScrollMode() {
+            const nextMode = this.pdfViewer.scrollMode === 'page' ? 'continuous' : 'page';
+            this.pdfViewer.scrollMode = nextMode;
+            if (this.pdfViewer.file && this.pdfViewer.file.id) {
+                try { localStorage.setItem(`pdf-scroll-mode-${this.pdfViewer.file.id}`, nextMode); } catch(e) {}
+            }
+            if (nextMode === 'continuous') {
+                this.$nextTick(() => {
+                    setTimeout(() => {
+                        const container = document.getElementById('pdf-continuous-container') || 
+                                          document.getElementById('share-pdf-continuous-container') || 
+                                          document.getElementById('share-folder-pdf-continuous-container');
+                        if (container) {
+                            const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${this.pdfViewer.currentPage}"]`);
+                            if (wrapper) {
+                                wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+                            }
+                        }
+                    }, 100);
+                });
+            } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
 
         init() {
+            window.addEventListener('tc-render-pdf-page', (e) => {
+                if (this.pdfViewer && this.pdfViewer.show && this.pdfViewer.scrollMode === 'continuous') {
+                    this.renderPdfContinuousPage(e.detail.pageNum);
+                }
+            });
+
             window.addEventListener('tc-translations-loaded', (e) => {
                 this.lang = '';
                 this.$nextTick(() => { this.lang = e.detail.lang; });
@@ -3289,6 +7392,7 @@ function shareFileApp() {
                 this.filename = nameEl.textContent.trim();
                 
                 const ext = this.filename.split('.').pop().toLowerCase();
+                this.unsupportedMedia = (TeleCloud.isAppleDevice() && ext === 'mkv');
                 const streamUrl = `/s/${this.token}/stream`;
                 
                 const result = TeleCloud.getFileTypeData(this.filename);
@@ -3304,16 +7408,20 @@ function shareFileApp() {
                 const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'ogv', '3gp', 'flv', 'wmv'];
                 const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus', 'oga', 'aac', 'm4b'];
                 const textExts = ['txt', 'md', 'log', 'json', 'js', 'py', 'go', 'html', 'css', 'yml', 'yaml', 'sql', 'sh', 'conf', 'ini', 'c', 'cpp', 'h', 'hpp', 'cs', 'java', 'rb', 'rs', 'swift'];
+                const isComicOrEpubOrPdf = (result.n === 'type_comic' || result.n === 'type_epub' || result.n === 'type_pdf');
+                this.tooLarge = (imgExts.includes(ext) && rawSize > 50 * 1024 * 1024) || 
+                                (isComicOrEpubOrPdf && rawSize > 150 * 1024 * 1024) || 
+                                (textExts.includes(ext) && rawSize > 10 * 1024 * 1024);
 
                 const mediaInjectedContent = document.getElementById('media-injected-content');
                 const idEl = this.$refs.id;
                 const rawId = idEl ? idEl.textContent.trim() : '';
+                this.id = rawId;
 
                 let injectedHtml = TeleCloud.getShareMediaHtml({ id: rawId, filename: this.filename, size: rawSize, has_thumb: hasThumb }, this.token);
 
                 if (injectedHtml) {
                     this.isMedia = true;
-                    if (imgExts.includes(ext) && rawSize > 50 * 1024 * 1024) this.tooLarge = true;
                     if (mediaInjectedContent) mediaInjectedContent.innerHTML = injectedHtml;
                 } else if (textExts.includes(ext)) {
                     this.isMedia = true;
@@ -3384,7 +7492,7 @@ function shareFileApp() {
                         }
                     }
 
-                    if (videoExts.includes(ext) || audioExts.includes(ext)) { 
+                    if ((videoExts.includes(ext) || audioExts.includes(ext)) && !(TeleCloud.isAppleDevice() && ext === 'mkv')) { 
                         setTimeout(() => { 
                             if (this.playerInstance) this.playerInstance.destroy();
                             const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#3b82f6';
@@ -3397,9 +7505,12 @@ function shareFileApp() {
                                 const plyrOpts = { controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'settings'], settings: ['speed'], speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] } };
                                 this.playerInstance = new Plyr('#tele-player', plyrOpts);
                             } else {
+                                const matchedSubs = [];
                                 this.playerInstance = new Artplayer({
                                     logger: false,
                                     container: '#tele-player',
+                                    lang: this.lang === 'vi' ? 'vi' : 'en',
+                                    i18n: artplayerI18n,
                                     url: streamUrl,
                                     poster: thumbUrl,
                                     title: this.filename,
@@ -3423,6 +7534,19 @@ function shareFileApp() {
                                         'webkit-playsinline': true,
                                         'x5-video-player-type': 'h5-page',
                                     },
+                                    subtitle: {
+                                        url: matchedSubs.length > 0 ? matchedSubs[0].url : '',
+                                        type: matchedSubs.length > 0 ? matchedSubs[0].type : 'vtt',
+                                        style: {
+                                            color: '#ffffff',
+                                            fontSize: '20px',
+                                            textShadow: '0 0 4px #000, 0 0 4px #000',
+                                        },
+                                        escape: false,
+                                    },
+                                    settings: [
+                                        buildArtplayerSubtitleSetting(this.filename, [], true, this.token, (k) => this.t(k))
+                                    ],
                                     icons: {
                                         loading: '<i class="fa-solid fa-spinner fa-spin text-4xl"></i>',
                                         state: '<i class="fa-solid fa-play text-4xl"></i>',

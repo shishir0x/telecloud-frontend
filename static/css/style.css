@@ -849,3 +849,40 @@ code[class*="language-"] {
         transform: scale(1.05);
     }
 }
+
+/* =========================================
+   COMIC READER - Image Loading States
+   ========================================= */
+.comic-img-loading {
+    position: relative;
+    min-height: 60vh;
+    width: 100%;
+    background: linear-gradient(
+        90deg,
+        rgba(30, 30, 50, 0.6) 25%,
+        rgba(80, 60, 120, 0.25) 50%,
+        rgba(30, 30, 50, 0.6) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s infinite linear;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.comic-img-loading::after {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(139, 92, 246, 0.25);
+    border-top-color: rgba(139, 92, 246, 0.8);
+    border-radius: 50%;
+    animation: premium-spin 0.8s linear infinite;
+}
+
+/* Img fades in once loaded (class added by JS) */
+img.comic-img-ready {
+    opacity: 1 !important;
+}

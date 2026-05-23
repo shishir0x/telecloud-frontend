@@ -36,6 +36,9 @@ download_lib() {
     curl -sSL "$url" -o "$out"
 }
 
+download_lib "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" "static/js/pdf.min.js"
+download_lib "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js" "static/js/pdf.worker.min.js"
+
 
 
 

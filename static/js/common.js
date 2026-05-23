@@ -56,6 +56,11 @@ const TeleCloud = window.TeleCloud = {
         return l;
     },
 
+    isAppleDevice() {
+        const ua = navigator.userAgent;
+        return /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
+    },
+
     formatBytes(bytes, decimals = 2) {
         if (!+bytes) return '0 B';
         const k = 1024;
@@ -147,8 +152,11 @@ const TeleCloud = window.TeleCloud = {
             'js': 'php', 'html': 'php', 'css': 'php', 'py': 'php', 'json': 'php', 'sql': 'php', 'c': 'php', 'cpp': 'php', 'h': 'php', 'hpp': 'php', 'cs': 'php', 'java': 'php', 'rb': 'php', 'rs': 'php', 'swift': 'php',
             'zip': { n: 'type_archive', c: 'bg-orange-100 text-orange-500 dark:bg-orange-500/20 dark:text-orange-400', i: '<i class="fa-solid fa-file-zipper text-2xl"></i>' },
             'rar': 'zip', 'ipa': 'zip', 'tar': 'zip', 'gz': 'zip', '7z': 'zip', 'apk': 'zip', 'iso': 'zip', 'bz2': 'zip',
-            'pdf': { n: 'type_doc', c: 'bg-red-100 text-red-500 dark:bg-red-500/20 dark:text-red-400', i: '<i class="fa-solid fa-file-pdf text-2xl"></i>' },
-            'doc': 'pdf', 'docx': 'pdf', 'xls': 'pdf', 'xlsx': 'pdf', 'ppt': 'pdf', 'pptx': 'pdf', 'csv': 'pdf',
+            'cbz': { n: 'type_comic', c: 'bg-violet-100 text-violet-500 dark:bg-violet-500/20 dark:text-violet-400', i: '<i class="fa-solid fa-book-open text-2xl"></i>' },
+            'epub': { n: 'type_epub', c: 'bg-emerald-100 text-emerald-500 dark:bg-emerald-500/20 dark:text-emerald-400', i: '<i class="fa-solid fa-book text-2xl"></i>' },
+            'pdf': { n: 'type_pdf', c: 'bg-red-100 text-red-500 dark:bg-red-500/20 dark:text-red-400', i: '<i class="fa-solid fa-file-pdf text-2xl"></i>' },
+            'doc': { n: 'type_doc', c: 'bg-red-100 text-red-500 dark:bg-red-500/20 dark:text-red-400', i: '<i class="fa-solid fa-file-pdf text-2xl"></i>' },
+            'docx': 'doc', 'xls': 'doc', 'xlsx': 'doc', 'ppt': 'doc', 'pptx': 'doc', 'csv': 'doc',
             'txt': { n: 'type_text', c: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400', i: '<i class="fa-solid fa-file-lines text-2xl"></i>' },
             'md': 'txt', 'log': 'txt', 'go': 'txt', 'yml': 'txt', 'yaml': 'txt', 'sh': 'txt', 'conf': 'txt', 'ini': 'txt'
         };
@@ -283,11 +291,21 @@ const TeleCloud = window.TeleCloud = {
                 ? `onclick="(function(el){var scope=Alpine.$data(document.body);if(scope&&scope.openImageViewer)scope.openImageViewer('${streamUrl}', el.alt)})(this)"`
                 : '';
             
-            const finalSrc = (hasThumb) ? thumbUrl : (size <= 50 * 1024 * 1024 ? streamUrl : '');
+            const finalSrc = (hasThumb) ? thumbUrl : streamUrl;
             if (!finalSrc) return '';
 
             return `<img src="${finalSrc}" alt="${safeFilename}" class="max-h-64 object-contain rounded-[1rem] w-full shadow-md cursor-zoom-in ${isBlur} opacity-0 scale-95 transition-all duration-700 transform" onload="this.classList.remove('opacity-0', 'scale-95'); this.classList.add('opacity-100', 'scale-100')" onerror="this.style.display='none'" ${lbAttr} ${clickHandler}>`;
         } else if (videoExts.includes(ext)) {
+            if (this.isAppleDevice() && ext === 'mkv') {
+                return `
+                <div class="w-full mb-2">
+                    <div class="w-full p-6 flex flex-col items-center justify-center bg-rose-50 dark:bg-rose-500/10 rounded-2xl border border-dashed border-rose-200 dark:border-rose-500/30 animate-fade-in text-center">
+                        <i class="fa-solid fa-circle-xmark text-4xl text-rose-500 mb-3 animate-pulse"></i>
+                        <p class="text-sm text-rose-800 dark:text-rose-400 font-bold mb-2">${this.t('err_video_mkv_apple_title')}</p>
+                        <p class="text-xs text-rose-600 dark:text-rose-500/80">${this.t('err_video_mkv_apple_desc')}</p>
+                    </div>
+                </div>`;
+            }
             const playerId = isShare ? 'tele-player' : 'index-tele-player';
             return `<div class="w-full aspect-video relative z-20 rounded-[1rem] bg-black shadow-md overflow-hidden"><div id="${playerId}" class="w-full h-full"></div></div>`;
         } else if (audioExts.includes(ext)) {

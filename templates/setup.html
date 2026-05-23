@@ -30,7 +30,7 @@
 <body
     class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen relative flex flex-col transition-colors duration-500"
     data-theme="system"
-    x-data="setupWizard('{{ .api_id }}', '{{ .api_hash }}', '{{ .log_group_id }}', {{ .admin_exists }})">
+    x-data="setupWizard('{{ .api_id }}', '{{ .api_hash }}', {{ .has_default_api }}, '{{ .log_group_id }}', {{ .admin_exists }})">
 
     <!-- Loading overlay before translations are loaded -->
     <div x-show="!translationsLoaded" x-transition:leave="transition ease-in duration-500"
@@ -105,10 +105,9 @@
 
         <div class="w-full min-h-[100dvh] flex flex-col items-center justify-center p-4 z-10 py-12">
             <div class="glass-panel p-8 md:p-10 rounded-[2rem] w-full max-w-md relative overflow-hidden">
-                <!-- Progress Bar -->
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-slate-200 dark:bg-slate-800">
                     <div class="h-full bg-blue-500 transition-all duration-500 ease-out"
-                        :style="'width: ' + ((step / 4) * 100) + '%'"></div>
+                        :style="'width: ' + (Math.min(step / 5, 1) * 100) + '%'"></div>
                 </div>
 
                 <div class="text-center mb-8 mt-2">
@@ -252,6 +251,102 @@
                             <p class="text-xs text-slate-500 px-8" x-text="t('setup_scan_qr_desc')"></p>
                         </div>
                     </div>
+
+                    <!-- Collapsible Advanced API Settings -->
+                    <div x-show="authStep === 'phone' || authStep === 'qr'" class="mt-6 pt-4 border-t border-slate-200/60 dark:border-slate-800/60">
+                        <button type="button" @click="showAdvanced = !showAdvanced" 
+                            class="flex items-center justify-between w-full py-2.5 px-3 rounded-xl hover:bg-slate-100/50 dark:hover:bg-slate-900/30 text-xs font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-all select-none border border-transparent hover:border-slate-200/40 dark:hover:border-slate-800/40">
+                            <span class="flex items-center gap-2">
+                                <i class="fa-solid fa-gears text-sm transition-transform duration-500" :class="showAdvanced ? 'rotate-90 text-blue-500' : ''"></i>
+                                <span x-text="t('setup_advanced_settings')">Cài đặt nâng cao</span>
+                            </span>
+                            <span class="flex items-center gap-2">
+                                <!-- Status Badge in Header -->
+                                <span class="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full border transition-all"
+                                    :class="!api_id ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-purple-500/5 border-purple-500/20 text-purple-600 dark:text-purple-400'"
+                                    x-text="!api_id ? 'Default' : 'Custom'"></span>
+                                <i class="fa-solid fa-chevron-down text-[10px] transition-transform duration-300" :class="showAdvanced ? 'rotate-180' : ''"></i>
+                            </span>
+                        </button>
+                        
+                        <div x-show="showAdvanced" x-collapse x-transition.duration.300ms class="mt-3" x-cloak>
+                            <div class="space-y-4 p-4 rounded-2xl bg-white/30 dark:bg-slate-950/20 border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-md shadow-sm">
+                                
+                                <!-- Active Status Indicator Badge (Dynamic & Pulsing) -->
+                                <div class="flex items-center justify-between p-3 rounded-xl border transition-all"
+                                    :class="!api_id ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-purple-500/5 border-purple-500/10 text-purple-600 dark:text-purple-400'">
+                                    <div class="flex items-center gap-2.5 text-[11px] font-semibold">
+                                        <span class="relative flex h-2 w-2">
+                                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                                                :class="!api_id ? 'bg-emerald-500' : 'bg-purple-500'"></span>
+                                            <span class="relative inline-flex rounded-full h-2 w-2"
+                                                :class="!api_id ? 'bg-emerald-500' : 'bg-purple-500'"></span>
+                                        </span>
+                                        <span x-text="!api_id ? (t('setup_api_status_default') || 'Đang dùng API mặc định hệ thống') : (t('setup_api_status_custom') || 'Đang dùng API cá nhân tự cấu hình')"></span>
+                                    </div>
+                                    <i :class="!api_id ? 'fa-solid fa-cloud-bolt text-xs opacity-70' : 'fa-solid fa-user-shield text-xs opacity-70'"></i>
+                                </div>
+
+                                <!-- Info Banner -->
+                                <div class="p-3.5 rounded-xl bg-blue-500/5 dark:bg-blue-500/5 border border-blue-500/10 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed space-y-1.5">
+                                    <div class="font-bold flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                                        <i class="fa-solid fa-circle-info text-sm"></i>
+                                        <span x-text="t('setup_advanced_api_title')">Cấu hình API Telegram</span>
+                                    </div>
+                                    <p x-html="t('setup_advanced_api_desc')"></p>
+                                </div>
+                                
+                                <!-- Inputs -->
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5"
+                                            x-text="t('setup_api_id')">API ID</label>
+                                        <div class="relative">
+                                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 dark:text-slate-500">
+                                                <i class="fa-solid fa-fingerprint text-xs"></i>
+                                            </span>
+                                            <input type="number" x-model="custom_api_id" placeholder="123456"
+                                                class="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl bg-white/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 dark:text-white transition-all">
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5"
+                                            x-text="t('setup_api_hash')">API HASH</label>
+                                        <div class="relative" x-data="{ showHash: false }">
+                                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 dark:text-slate-500">
+                                                <i class="fa-solid fa-key text-xs"></i>
+                                            </span>
+                                            <input :type="showHash ? 'text' : 'password'" x-model="custom_api_hash" placeholder="abcdef1234567890abcdef1234567890"
+                                                class="w-full pl-9 pr-10 py-2.5 text-sm rounded-xl bg-white/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 dark:text-white transition-all font-mono">
+                                            <button type="button" @click="showHash = !showHash" 
+                                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                                <i class="fa-solid text-xs" :class="showHash ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Buttons Row -->
+                                <div class="flex gap-2 pt-1">
+                                    <button type="button" @click="saveCustomApi" :disabled="loading || !custom_api_id || !custom_api_hash"
+                                        class="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md hover:shadow-blue-500/10 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                                        <i class="fa-solid fa-circle-check" x-show="!loading"></i>
+                                        <i class="fa-solid fa-spinner fa-spin" x-show="loading"></i>
+                                        <span x-text="t('setup_save_api')">Lưu & Áp dụng</span>
+                                    </button>
+                                    
+                                    <button type="button" @click="restoreDefaultApi" :disabled="loading || !has_default_api || !api_id"
+                                        class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/60 dark:hover:bg-slate-800/80 border border-slate-200/40 dark:border-slate-800/40 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                        :title="t('setup_restore_default_api')">
+                                        <i class="fa-solid fa-rotate-left"></i>
+                                        <span x-text="t('setup_restore_default_api') || 'Mặc định'">Mặc định</span>
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Step 3: Log Group -->
@@ -315,6 +410,12 @@
                             x-text="t('setup_complete_title')"></h2>
                         <p class="mt-2 text-slate-600 dark:text-slate-400" x-text="t('setup_complete_desc')"></p>
                     </div>
+                    <template x-if="log_group_id !== 'me' && log_group_id !== 'self'">
+                        <div class="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200/50 dark:border-blue-800/30 text-blue-800 dark:text-blue-200 text-xs leading-relaxed text-left flex items-start gap-2">
+                            <i class="fa-solid fa-circle-info text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0"></i>
+                            <span x-text="t('setup_bot_pool_suggest')"></span>
+                        </div>
+                    </template>
                     <div
                         class="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 text-amber-800 dark:text-amber-200 text-sm leading-relaxed">
                         <i class="fa-solid fa-circle-info mr-1"></i>
@@ -326,20 +427,25 @@
                         <span x-text="loading ? t('setup_restarting') : t('setup_restart_finish')"></span>
                     </button>
                 </div>
+                </div>
             </div>
-        </div>
-
-    </div> <!-- Close main content wrapper -->
+</div> <!-- Close main content wrapper -->
 
     <script>
         document.addEventListener('alpine:init', () => {
-            Alpine.data('setupWizard', (initApiId, initApiHash, initLogGroupId, adminExists) => ({
-                step: 1, // 1: API, 2: Auth, 3: LogGroup, 4: Admin
+            Alpine.data('setupWizard', (initApiId, initApiHash, hasDefaultApi, initLogGroupId, adminExists) => ({
+                step: 1, // 1: API, 2: Auth, 3: LogGroup, 4: Admin, 5: Complete
                 admin_exists: adminExists,
                 authStep: 'phone', // phone, code, password
 
                 api_id: initApiId === '0' ? '' : initApiId,
                 api_hash: initApiHash,
+                has_default_api: hasDefaultApi,
+
+                custom_api_id: initApiId === '0' ? '' : initApiId,
+                custom_api_hash: initApiHash,
+
+                showAdvanced: false,
                 log_group_id: initLogGroupId || '',
 
                 admin_username: '',
@@ -354,10 +460,6 @@
                 qr_poll_interval: null,
                 qr_countdown: 30,
                 qr_timer: null,
-
-                admin_username: '',
-                admin_password: '',
-                admin_confirm: '',
 
                 loading: false,
 
@@ -402,23 +504,25 @@
                         this.translationsLoaded = true;
                     }
 
-                    // Check if env had API config
-                    if (this.api_id && this.api_hash) {
+                    let hasConfig = (this.api_id && this.api_hash) || this.has_default_api;
+                    if (hasConfig) {
                         this.loading = true;
-                        // Auto save config and move to step 2/3
-                        await this.doApiConfig();
-
-                        // Check if telegram is already authorized
-                        let isAuth = await this.checkTgAuth();
-                        if (isAuth) {
-                            if (this.log_group_id) {
-                                // If env also had log group, test it
-                                await this.doLogGroup();
-                            } else {
-                                this.step = 3;
+                        try {
+                            if (this.api_id && this.api_hash) {
+                                // Auto save custom config
+                                await this.doApiConfig();
                             }
-                        } else {
-                            this.step = 2;
+
+                            // Check if telegram is already authorized
+                            let isAuth = await this.checkTgAuth();
+                            if (isAuth) {
+                                this.step = 3;
+                            } else {
+                                this.step = 2;
+                            }
+                        } catch (e) {
+                            // Fallback to step 1 if auto-save fails
+                            this.step = 1;
                         }
                         this.loading = false;
                     }
@@ -449,7 +553,8 @@
                         1: this.t('setup_desc_api'),
                         2: this.t('setup_desc_auth'),
                         3: this.t('setup_desc_log'),
-                        4: this.t('setup_desc_admin')
+                        4: this.t('setup_desc_admin'),
+                        5: this.t('setup_complete_desc')
                     }[this.step];
                 },
 
@@ -471,6 +576,72 @@
                         this.showError(e.message);
                     }
                     this.loading = false;
+                },
+
+                async saveCustomApi() {
+                    if (!this.custom_api_id || !this.custom_api_hash) {
+                        this.showError('API ID and API Hash are required');
+                        return;
+                    }
+                    this.loading = true;
+                    try {
+                        this.api_id = this.custom_api_id;
+                        this.api_hash = this.custom_api_hash;
+                        await this.doApiConfig();
+                        this.toastModal = {
+                            show: true,
+                            type: 'success',
+                            message: this.t('setup_api_saved'),
+                            persistent: false
+                        };
+                    } catch (e) {
+                        this.showError(e.message);
+                    }
+                    this.loading = false;
+                },
+
+                async restoreDefaultApi() {
+                    this.loading = true;
+                    try {
+                        let fd = new FormData();
+                        fd.append('restore_default', 'true');
+                        fd.append('site_url', window.location.origin);
+                        let r = await fetch('/api/setup/config', { method: 'POST', body: fd, headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() } });
+                        if (!r.ok) throw new Error((await r.json()).error || 'Failed');
+
+                        this.api_id = '';
+                        this.api_hash = '';
+                        this.custom_api_id = '';
+                        this.custom_api_hash = '';
+
+                        this.toastModal = {
+                            show: true,
+                            type: 'success',
+                            message: this.t('setup_api_restored'),
+                            persistent: false
+                        };
+                    } catch (e) {
+                        this.showError(e.message);
+                    }
+                    this.loading = false;
+                },
+
+                formatBotError(err) {
+                    if (!err) return '';
+                    let errStr = err.toLowerCase();
+                    if (errStr.includes('invalid') || errStr.includes('400') || errStr.includes('unauthorized')) {
+                        if (errStr.includes('peer') || errStr.includes('channel') || errStr.includes('chat') || errStr.includes('resolve')) {
+                            return this.t('err_bot_peer_invalid');
+                        }
+                        return this.t('err_bot_token_invalid');
+                    }
+                    if (errStr.includes('write_forbidden') || errStr.includes('forbidden') || errStr.includes('write')) {
+                        return this.t('err_bot_write_forbidden');
+                    }
+                    if (errStr.includes('timeout') || errStr.includes('deadline')) {
+                        return this.t('err_bot_timeout');
+                    }
+                    return err;
                 },
 
                 async checkTgAuth() {
@@ -619,20 +790,9 @@
                                     message: this.t('setup_auth_success'),
                                     persistent: false
                                 };
-                                setTimeout(async () => {
+                                setTimeout(() => {
                                     this.toastModal.show = false;
-                                    if (this.log_group_id) {
-                                        this.loading = true;
-                                        try {
-                                            await this.doLogGroup();
-                                        } catch (e) {
-                                            this.showError(e.message);
-                                            this.step = 3;
-                                        }
-                                        this.loading = false;
-                                    } else {
-                                        this.step = 3;
-                                    }
+                                    this.step = 3;
                                 }, 1500);
                             } else if (res.authState === 'verifying') {
                                 this.loading = true;
@@ -683,7 +843,7 @@
                     }
 
                     if (this.admin_exists) {
-                        this.step = 5; // Skip admin creation if already exists
+                        this.step = 5;
                     } else {
                         this.step = 4;
                     }
