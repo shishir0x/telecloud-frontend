@@ -3259,7 +3259,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                         const savedChapter = file.id ? parseInt(localStorage.getItem(`epub-ch-${file.id}`) || '0') : 0;
                         this.epubViewer.currentChapter = Math.max(0, Math.min(savedChapter, this.epubViewer.spine.length - 1));
                         
-                        this._loadEpubChapter(file);
+                        this._loadEpubChapter(file, false, true);
                     } catch (err) {
                         console.error('EPUB meta failed:', err);
                         if (this.epubViewer.file && String(this.epubViewer.file.id) === String(file.id) && this.epubViewer.file.filename === file.filename) {
@@ -3298,7 +3298,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             }
             return baseParts.join('/');
         },
-        _loadEpubChapter(file, startAtBottom = false) {
+        _loadEpubChapter(file, startAtBottom = false, restoreScroll = false) {
             const chapter = this.epubViewer.spine[this.epubViewer.currentChapter];
             if (!chapter) return;
             
@@ -3340,7 +3340,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 if (startAtBottom) {
                     try { win.scrollTo(0, doc.documentElement.scrollHeight || doc.body.scrollHeight || 999999); } catch(e) {}
                 } else {
-                    const savedScroll = file.id ? localStorage.getItem(`epub-scroll-${file.id}`) : null;
+                    const savedScroll = (restoreScroll && file.id) ? localStorage.getItem(`epub-scroll-${file.id}`) : null;
                     if (savedScroll) {
                         try { win.scrollTo(0, parseInt(savedScroll)); } catch(e) {}
                         localStorage.removeItem(`epub-scroll-${file.id}`);
