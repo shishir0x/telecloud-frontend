@@ -157,13 +157,13 @@
                     x-cloak>
                     <div x-show="authStep === 'phone' || authStep === 'qr'"
                         class="flex gap-2 p-1 bg-slate-100 dark:bg-slate-900/60 rounded-xl mb-6">
-                        <button @click="authStep = 'phone'" :disabled="loading"
-                            class="flex-1 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-50"
+                        <button @click="authStep === 'qr' ? cancelAuthFlow() : authStep = 'phone'" :disabled="loading && authStep !== 'qr'"
+                            class="flex-1 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
                             :class="authStep === 'phone' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'">
                             <i class="fa-solid fa-phone"></i> <span x-text="t('setup_login_phone')"></span>
                         </button>
                         <button @click="startQRLogin()" :disabled="loading"
-                            class="flex-1 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-50"
+                            class="flex-1 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
                             :class="authStep === 'qr' ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'">
                             <i class="fa-solid fa-qrcode"></i> <span x-text="t('setup_login_qr')"></span>
                         </button>
@@ -249,6 +249,11 @@
                             <p class="text-sm font-medium text-slate-900 dark:text-white"
                                 x-text="t('setup_scan_qr_title')"></p>
                             <p class="text-xs text-slate-500 px-8" x-text="t('setup_scan_qr_desc')"></p>
+                        </div>
+                        <div class="px-8 pt-2">
+                            <button type="button" @click="cancelAuthFlow()" :disabled="loading"
+                                class="w-full py-3.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold transition-all shadow-md active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                                x-text="t('setup_back_phone') || 'Quay lại'"></button>
                         </div>
                     </div>
 
@@ -359,13 +364,53 @@
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2"
                                 x-text="t('setup_log_group_id')"></label>
-                            <input type="text" x-model="log_group_id" placeholder="-1001234567890 or me" required
-                                class="w-full p-4 rounded-xl bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white backdrop-blur-sm transition-all font-mono">
-                            <p class="text-xs text-slate-500 mt-2" x-text="t('setup_log_group_help')"></p>
+                            <div class="relative">
+                                <input type="text" x-model="log_group_id" placeholder="-1001234567890 or me" required
+                                    class="w-full p-4 pr-28 rounded-xl bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white backdrop-blur-sm transition-all font-mono">
+                                <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                                    <button type="button" @click="log_group_id = 'me'"
+                                        class="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 shadow-md shadow-blue-500/20 select-none cursor-pointer"
+                                        x-text="t('setup_use_me_btn')">Dùng 'me'</button>
+                                    <button type="button" @click="log_group_id = ''" x-show="log_group_id"
+                                        class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                                        :title="t('clear') || 'Xóa'">
+                                        <i class="fa-solid fa-xmark text-sm"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Pros/Cons and Details about using 'me' vs Group -->
+                            <div class="mt-4 p-4 rounded-2xl bg-white/30 dark:bg-slate-950/20 border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-md shadow-sm space-y-3">
+                                <div class="text-[11px] leading-relaxed space-y-2">
+                                    <div class="font-bold flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                                        <i class="fa-solid fa-circle-question text-sm"></i>
+                                        <span x-text="t('setup_log_group_explain_title')">Tại sao nên/không nên dùng 'me'?</span>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-2 mt-1">
+                                        <div class="p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                            <span class="font-semibold text-amber-600 dark:text-amber-400 block mb-0.5" x-text="t('setup_log_group_explain_me_title')">⚠️ Dùng "me" (Saved Messages):</span>
+                                            <p class="text-slate-600 dark:text-slate-400" x-text="t('setup_log_group_explain_me')"></p>
+                                        </div>
+                                        <div class="p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                                            <span class="font-semibold text-emerald-600 dark:text-emerald-400 block mb-0.5" x-text="t('setup_log_group_explain_group_title')">✅ Dùng Nhóm (Log Group ID):</span>
+                                            <p class="text-slate-600 dark:text-slate-400" x-text="t('setup_log_group_explain_group')"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Guide to find LOG_GROUP_ID -->
+                                <div class="pt-2 border-t border-slate-200/50 dark:border-slate-800/50 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                    <div class="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-1.5">
+                                        <i class="fa-solid fa-circle-info text-sm text-blue-500"></i>
+                                        <span x-text="t('setup_log_group_guide_title')">Cách lấy LOG_GROUP_ID:</span>
+                                    </div>
+                                    <p x-html="t('setup_log_group_guide_desc')"></p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <button type="submit" :disabled="loading"
-                        class="mt-8 w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-lg active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-50">
+                        class="mt-6 w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-lg active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-50">
                         <i class="fa-solid fa-spinner fa-spin" x-show="loading"></i>
                         <span x-text="loading ? t('setup_testing') : t('setup_verify_continue')"></span>
                     </button>
@@ -824,6 +869,7 @@
                                     this.qr_timestamp = Date.now();
                                     this.qr_countdown = 30; // Reset countdown
                                 }
+                                this.loading = false;
                             }
                         } catch (e) { }
                     }, 2000);
