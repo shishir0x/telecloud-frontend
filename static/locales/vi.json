@@ -583,5 +583,11 @@
     "ytdlp_note": "Media sẽ được tải về server và tự động đẩy lên Telegram. Bạn có thể theo dõi tiến trình trong hàng đợi tải lên.",
     "ytdlp_started": "Đã bắt đầu tác vụ tải",
     "ytdlp_thumbnail": "Đang xử lý ảnh bìa...",
-    "ytdlp_url_label": "YouTube / Social Media URL"
+    "ytdlp_url_label": "YouTube / Social Media URL",
+    "slideshow": "Trình chiếu",
+    "play": "Phát",
+    "pause": "Tạm dừng",
+    "no_images_to_play": "Không có hình ảnh nào để trình chiếu",
+    "slideshow_no_images_selected": "Không tìm thấy ảnh hợp lệ trong phần đã chọn để trình chiếu",
+    "slideshow_speed": "Chạm để đổi tốc độ"
 }

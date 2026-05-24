@@ -1108,6 +1108,10 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         searchQuery: '',
         currentPage: 1,
         itemsPerPage: 30,
+        get imageFiles() {
+            const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif'];
+            return this.filteredFiles.filter(f => !f.is_folder && imgExts.includes(f.filename.split('.').pop().toLowerCase()));
+        },
         get filteredFiles() {
             let results = [...this.files];
             if (this.searchQuery.trim() !== '') {
@@ -1209,8 +1213,33 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         toastModal: { show: false, message: '', type: 'success', persistent: false },
         toastTimeout: null,
         playerInstance: null,
-        imageViewer: { show: false, src: '', filename: '' },
+        imageViewer: { 
+            show: false, 
+            src: '', 
+            filename: '', 
+            currentFile: null, 
+            isSlideshow: false, 
+            slideshowInterval: null, 
+            slideshowSpeed: 5000, 
+            slideshowFiles: [], 
+            slideshowIndex: 0,
+            transitionDirection: 'next'
+        },
         lightboxLoading: false,
+        lightboxZoomed: false,
+        lightboxControlsVisible: true,
+        lightboxControlsTimeout: null,
+        resetLightboxControlsTimeout() {
+            this.lightboxControlsVisible = true;
+            if (this.lightboxControlsTimeout) {
+                clearTimeout(this.lightboxControlsTimeout);
+            }
+            this.lightboxControlsTimeout = setTimeout(() => {
+                if (this.imageViewer.show) {
+                    this.lightboxControlsVisible = false;
+                }
+            }, 3000);
+        },
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '' },
         pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
@@ -1218,6 +1247,27 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         modal: { show: false, type: 'alert', title: '', message: '', input: '', resolve: null, isDanger: false, inputType: 'text', applyToAll: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
         init() { 
+            this.$watch('imageViewer.show', value => {
+                if (!value) {
+                    this.stopSlideshow();
+                    this.imageViewer.isSlideshow = false;
+                    this.imageViewer.slideshowFiles = [];
+                    this.imageViewer.currentFile = null;
+                    this.lightboxZoomed = false;
+                    if (this.lightboxControlsTimeout) {
+                        clearTimeout(this.lightboxControlsTimeout);
+                        this.lightboxControlsTimeout = null;
+                    }
+                    this.lightboxControlsVisible = true;
+                } else {
+                    this.resetLightboxControlsTimeout();
+                }
+            });
+
+            this.$watch('imageViewer.src', () => {
+                this.lightboxZoomed = false;
+            });
+
             window.addEventListener('tc-render-pdf-page', (e) => {
                 if (this.pdfViewer && this.pdfViewer.show && this.pdfViewer.scrollMode === 'continuous') {
                     this.renderPdfContinuousPage(e.detail.pageNum);
@@ -2847,6 +2897,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     const response = await fetch(`/api/files/${file.id}/share`, { method: 'DELETE', headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() } });
                     if (response.ok) {
                         targetFile.share_token = null;
+                        targetFile.has_share_password = false;
                         this.showToast(this.t('toast_revoked'), 'success');
                     } else {
                         const data = await response.json();
@@ -2861,7 +2912,8 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     if (response.ok) {
                         const data = await response.json();
                         targetFile.share_token = data.share_token;
-                        targetFile.direct_token = data.direct_token; 
+                        targetFile.direct_token = data.direct_token;
+                        targetFile.has_share_password = !!password;
                         this.copyShareLink(targetFile, 'regular');
                     } else {
                         targetFile.share_token = null;
@@ -2931,13 +2983,220 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             if (this.plyrInstance) { this.plyrInstance.destroy(); this.plyrInstance = null; }
             setTimeout(() => { if (!this.fileInfoModal.show) { this.fileInfoModal.isMedia = false; this.fileInfoModal.mediaHtml = ''; this.fileInfoModal.isLarge = false; this.fileInfoModal.isPreviewLoading = false; this.fileInfoModal.needsLoad = false; this.fileInfoModal.tooLarge = false; this.fileInfoModal.bypassWarning = false; this.fileInfoModal.unsupportedMedia = false; } }, 300);
         },
-        openImageViewer(src, filename) {
-            if (this.imageViewer.src === src) {
+        openImageViewer(src, filename, file = null) {
+            if (this.imageViewer.src === src && this.imageViewer.filename === filename) {
                 this.imageViewer.show = true;
+                if (file) {
+                    this.imageViewer.currentFile = file;
+                }
                 return;
             }
             this.lightboxLoading = true;
-            this.imageViewer = { show: true, src, filename };
+            this.imageViewer = { 
+                show: true, 
+                src, 
+                filename, 
+                currentFile: file,
+                isSlideshow: this.imageViewer.isSlideshow,
+                slideshowInterval: this.imageViewer.slideshowInterval,
+                slideshowSpeed: this.imageViewer.slideshowSpeed || 5000,
+                slideshowFiles: this.imageViewer.slideshowFiles || [],
+                slideshowIndex: this.imageViewer.slideshowIndex || 0,
+                transitionDirection: this.imageViewer.transitionDirection || 'next'
+            };
+        },
+        onLightboxImageLoad() {
+            this.lightboxLoading = false;
+            if (this.imageViewer.isSlideshow && this.imageViewer.slideshowInterval) {
+                if (this.imageViewer.slideshowInterval !== 'waiting') {
+                    clearTimeout(this.imageViewer.slideshowInterval);
+                }
+                this.imageViewer.slideshowInterval = setTimeout(() => {
+                    this.nextSlideshowImage();
+                }, this.imageViewer.slideshowSpeed);
+            }
+        },
+        prevImage() {
+            this.imageViewer.transitionDirection = 'prev';
+            if (this.imageViewer.isSlideshow && this.imageViewer.slideshowFiles.length > 0) {
+                this.prevSlideshowImage();
+                return;
+            }
+            const images = this.imageFiles;
+            if (images.length <= 1 || !this.imageViewer.currentFile) return;
+            const currentIndex = images.findIndex(f => String(f.id) === String(this.imageViewer.currentFile.id));
+            if (currentIndex === -1) return;
+            let prevIndex = currentIndex - 1;
+            if (prevIndex < 0) prevIndex = images.length - 1;
+            const prevFile = images[prevIndex];
+            this.lightboxLoading = true;
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${prevFile.id}/stream`;
+            } else {
+                src = `/api/files/${prevFile.id}/stream`;
+            }
+            this.imageViewer.src = src;
+            this.imageViewer.filename = prevFile.filename;
+            this.imageViewer.currentFile = prevFile;
+        },
+        nextImage() {
+            this.imageViewer.transitionDirection = 'next';
+            if (this.imageViewer.isSlideshow && this.imageViewer.slideshowFiles.length > 0) {
+                this.nextSlideshowImage();
+                return;
+            }
+            const images = this.imageFiles;
+            if (images.length <= 1 || !this.imageViewer.currentFile) return;
+            const currentIndex = images.findIndex(f => String(f.id) === String(this.imageViewer.currentFile.id));
+            if (currentIndex === -1) return;
+            let nextIndex = currentIndex + 1;
+            if (nextIndex >= images.length) nextIndex = 0;
+            const nextFile = images[nextIndex];
+            this.lightboxLoading = true;
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${nextFile.id}/stream`;
+            } else {
+                src = `/api/files/${nextFile.id}/stream`;
+            }
+            this.imageViewer.src = src;
+            this.imageViewer.filename = nextFile.filename;
+            this.imageViewer.currentFile = nextFile;
+        },
+        startSlideshow() {
+            if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                clearTimeout(this.imageViewer.slideshowInterval);
+            }
+            this.imageViewer.isSlideshow = true;
+            if (!this.lightboxLoading) {
+                this.imageViewer.slideshowInterval = setTimeout(() => {
+                    this.nextSlideshowImage();
+                }, this.imageViewer.slideshowSpeed);
+            } else {
+                this.imageViewer.slideshowInterval = 'waiting';
+            }
+        },
+        stopSlideshow() {
+            if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                clearTimeout(this.imageViewer.slideshowInterval);
+            }
+            this.imageViewer.slideshowInterval = null;
+            this.imageViewer.isSlideshow = false;
+        },
+        toggleSlideshow() {
+            if (this.imageViewer.slideshowInterval) {
+                this.stopSlideshow();
+            } else {
+                this.startSlideshow();
+            }
+        },
+        nextSlideshowImage() {
+            this.imageViewer.transitionDirection = 'next';
+            const files = this.imageViewer.slideshowFiles;
+            if (!files || files.length === 0) return;
+            // Only 1 image: reschedule timer without reloading (src unchanged → @load won't fire)
+            if (files.length === 1) {
+                if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                    clearTimeout(this.imageViewer.slideshowInterval);
+                }
+                if (this.imageViewer.slideshowInterval !== null) {
+                    this.imageViewer.slideshowInterval = setTimeout(() => {
+                        this.nextSlideshowImage();
+                    }, this.imageViewer.slideshowSpeed);
+                }
+                return;
+            }
+            let nextIndex = this.imageViewer.slideshowIndex + 1;
+            if (nextIndex >= files.length) nextIndex = 0;
+            this.imageViewer.slideshowIndex = nextIndex;
+            const nextFile = files[nextIndex];
+            
+            let wasPlaying = !!this.imageViewer.slideshowInterval;
+            if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                clearTimeout(this.imageViewer.slideshowInterval);
+            }
+            this.imageViewer.slideshowInterval = wasPlaying ? 'waiting' : null;
+
+            this.lightboxLoading = true;
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${nextFile.id}/stream`;
+            } else {
+                src = `/api/files/${nextFile.id}/stream`;
+            }
+            this.imageViewer.src = src;
+            this.imageViewer.filename = nextFile.filename;
+            this.imageViewer.currentFile = nextFile;
+        },
+        prevSlideshowImage() {
+            this.imageViewer.transitionDirection = 'prev';
+            const files = this.imageViewer.slideshowFiles;
+            if (!files || files.length === 0) return;
+            // Only 1 image: reschedule timer without reloading
+            if (files.length === 1) {
+                if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                    clearTimeout(this.imageViewer.slideshowInterval);
+                }
+                if (this.imageViewer.slideshowInterval !== null) {
+                    this.imageViewer.slideshowInterval = setTimeout(() => {
+                        this.nextSlideshowImage();
+                    }, this.imageViewer.slideshowSpeed);
+                }
+                return;
+            }
+            let prevIndex = this.imageViewer.slideshowIndex - 1;
+            if (prevIndex < 0) prevIndex = files.length - 1;
+            this.imageViewer.slideshowIndex = prevIndex;
+            const prevFile = files[prevIndex];
+            
+            let wasPlaying = !!this.imageViewer.slideshowInterval;
+            if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                clearTimeout(this.imageViewer.slideshowInterval);
+            }
+            this.imageViewer.slideshowInterval = wasPlaying ? 'waiting' : null;
+
+            this.lightboxLoading = true;
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${prevFile.id}/stream`;
+            } else {
+                src = `/api/files/${prevFile.id}/stream`;
+            }
+            this.imageViewer.src = src;
+            this.imageViewer.filename = prevFile.filename;
+            this.imageViewer.currentFile = prevFile;
+        },
+        startSelectedSlideshow() {
+            let slideshowFiles = [];
+            const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif'];
+            if (this.selectedIds && this.selectedIds.length > 0) {
+                let selectedFiles = this.files.filter(f => this.selectedIds.includes(f.id));
+                slideshowFiles = selectedFiles.filter(f => !f.is_folder && imgExts.includes(f.filename.split('.').pop().toLowerCase()));
+                if (slideshowFiles.length === 0) {
+                    this.showToast(this.t('slideshow_no_images_selected'), 'error');
+                    return;
+                }
+            } else {
+                slideshowFiles = this.imageFiles;
+                if (slideshowFiles.length === 0) {
+                    this.showToast(this.t('no_images_to_play'), 'error');
+                    return;
+                }
+            }
+            this.imageViewer.isSlideshow = true;
+            this.imageViewer.slideshowFiles = slideshowFiles;
+            this.imageViewer.slideshowIndex = 0;
+            this.imageViewer.slideshowSpeed = 5000;
+            const firstFile = slideshowFiles[0];
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${firstFile.id}/stream`;
+            } else {
+                src = `/api/files/${firstFile.id}/stream`;
+            }
+            this.openImageViewer(src, firstFile.filename, firstFile);
+            this.startSlideshow();
         },
         saveComicProgress() {
             if (this.comicViewer.file && this.comicViewer.file.id) {
@@ -3386,16 +3645,26 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         },
         nextEpubChapter() {
             if (this.epubViewer.currentChapter < this.epubViewer.spine.length - 1) {
-                this._saveEpubScroll();
                 this.epubViewer.currentChapter++;
-                this._loadEpubChapter(this.epubViewer.file, false);
+                if (this.epubViewer.file && this.epubViewer.file.id) {
+                    try {
+                        localStorage.setItem(`epub-ch-${this.epubViewer.file.id}`, this.epubViewer.currentChapter);
+                        localStorage.removeItem(`epub-scroll-${this.epubViewer.file.id}`);
+                    } catch(e) {}
+                }
+                this._loadEpubChapter(this.epubViewer.file, false, false);
             }
         },
         prevEpubChapter(startAtBottom = false) {
             if (this.epubViewer.currentChapter > 0) {
-                this._saveEpubScroll();
                 this.epubViewer.currentChapter--;
-                this._loadEpubChapter(this.epubViewer.file, startAtBottom);
+                if (this.epubViewer.file && this.epubViewer.file.id) {
+                    try {
+                        localStorage.setItem(`epub-ch-${this.epubViewer.file.id}`, this.epubViewer.currentChapter);
+                        localStorage.removeItem(`epub-scroll-${this.epubViewer.file.id}`);
+                    } catch(e) {}
+                }
+                this._loadEpubChapter(this.epubViewer.file, startAtBottom, false);
             }
         },
         _saveEpubScroll() {
@@ -3419,7 +3688,13 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             
             if (idx >= 0) {
                 this.epubViewer.currentChapter = idx;
-                this._loadEpubChapter(this.epubViewer.file, false);
+                if (this.epubViewer.file && this.epubViewer.file.id) {
+                    try {
+                        localStorage.setItem(`epub-ch-${this.epubViewer.file.id}`, this.epubViewer.currentChapter);
+                        localStorage.removeItem(`epub-scroll-${this.epubViewer.file.id}`);
+                    } catch(e) {}
+                }
+                this._loadEpubChapter(this.epubViewer.file, false, false);
                 if (fragment) {
                     setTimeout(() => {
                         const iframe = document.getElementById('epub-iframe');
@@ -4711,6 +4986,10 @@ function shareApp() {
         searchQuery: '',
         currentPage: 1,
         itemsPerPage: 30,
+        get imageFiles() {
+            const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif'];
+            return this.filteredFiles.filter(f => !f.is_folder && imgExts.includes(f.filename.split('.').pop().toLowerCase()));
+        },
         get filteredFiles() {
             let results = [...this.files];
             if (this.searchQuery.trim() !== '') {
@@ -4760,8 +5039,33 @@ function shareApp() {
         selectedIds: [], 
 
         plyrInstance: null,
-        imageViewer: { show: false, src: '', filename: '' },
+        imageViewer: { 
+            show: false, 
+            src: '', 
+            filename: '', 
+            currentFile: null, 
+            isSlideshow: false, 
+            slideshowInterval: null, 
+            slideshowSpeed: 5000, 
+            slideshowFiles: [], 
+            slideshowIndex: 0,
+            transitionDirection: 'next'
+        },
         lightboxLoading: false,
+        lightboxZoomed: false,
+        lightboxControlsVisible: true,
+        lightboxControlsTimeout: null,
+        resetLightboxControlsTimeout() {
+            this.lightboxControlsVisible = true;
+            if (this.lightboxControlsTimeout) {
+                clearTimeout(this.lightboxControlsTimeout);
+            }
+            this.lightboxControlsTimeout = setTimeout(() => {
+                if (this.imageViewer.show) {
+                    this.lightboxControlsVisible = false;
+                }
+            }, 3000);
+        },
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '' },
         pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
@@ -4769,6 +5073,27 @@ function shareApp() {
         contextMenu: { show: false, x: 0, y: 0, file: null },
         
         init() { 
+            this.$watch('imageViewer.show', value => {
+                if (!value) {
+                    this.stopSlideshow();
+                    this.imageViewer.isSlideshow = false;
+                    this.imageViewer.slideshowFiles = [];
+                    this.imageViewer.currentFile = null;
+                    this.lightboxZoomed = false;
+                    if (this.lightboxControlsTimeout) {
+                        clearTimeout(this.lightboxControlsTimeout);
+                        this.lightboxControlsTimeout = null;
+                    }
+                    this.lightboxControlsVisible = true;
+                } else {
+                    this.resetLightboxControlsTimeout();
+                }
+            });
+
+            this.$watch('imageViewer.src', () => {
+                this.lightboxZoomed = false;
+            });
+
             this.shareToken = this.$refs.token ? this.$refs.token.textContent.trim() : '';
             window.addEventListener('tc-render-pdf-page', (e) => {
                 if (this.pdfViewer && this.pdfViewer.show && this.pdfViewer.scrollMode === 'continuous') {
@@ -4834,13 +5159,220 @@ function shareApp() {
             if (this.plyrInstance) { this.plyrInstance.destroy(); this.plyrInstance = null; }
             setTimeout(() => { if (!this.fileInfoModal.show) { this.fileInfoModal.isMedia = false; this.fileInfoModal.mediaHtml = ''; this.fileInfoModal.isLarge = false; this.fileInfoModal.isPreviewLoading = false; this.fileInfoModal.needsLoad = false; this.fileInfoModal.tooLarge = false; this.fileInfoModal.bypassWarning = false; this.fileInfoModal.unsupportedMedia = false; } }, 300);
         },
-        openImageViewer(src, filename) {
-            if (this.imageViewer.src === src) {
+        openImageViewer(src, filename, file = null) {
+            if (this.imageViewer.src === src && this.imageViewer.filename === filename) {
                 this.imageViewer.show = true;
+                if (file) {
+                    this.imageViewer.currentFile = file;
+                }
                 return;
             }
             this.lightboxLoading = true;
-            this.imageViewer = { show: true, src, filename };
+            this.imageViewer = { 
+                show: true, 
+                src, 
+                filename, 
+                currentFile: file,
+                isSlideshow: this.imageViewer.isSlideshow,
+                slideshowInterval: this.imageViewer.slideshowInterval,
+                slideshowSpeed: this.imageViewer.slideshowSpeed || 5000,
+                slideshowFiles: this.imageViewer.slideshowFiles || [],
+                slideshowIndex: this.imageViewer.slideshowIndex || 0,
+                transitionDirection: this.imageViewer.transitionDirection || 'next'
+            };
+        },
+        onLightboxImageLoad() {
+            this.lightboxLoading = false;
+            if (this.imageViewer.isSlideshow && this.imageViewer.slideshowInterval) {
+                if (this.imageViewer.slideshowInterval !== 'waiting') {
+                    clearTimeout(this.imageViewer.slideshowInterval);
+                }
+                this.imageViewer.slideshowInterval = setTimeout(() => {
+                    this.nextSlideshowImage();
+                }, this.imageViewer.slideshowSpeed);
+            }
+        },
+        prevImage() {
+            this.imageViewer.transitionDirection = 'prev';
+            if (this.imageViewer.isSlideshow && this.imageViewer.slideshowFiles.length > 0) {
+                this.prevSlideshowImage();
+                return;
+            }
+            const images = this.imageFiles;
+            if (images.length <= 1 || !this.imageViewer.currentFile) return;
+            const currentIndex = images.findIndex(f => String(f.id) === String(this.imageViewer.currentFile.id));
+            if (currentIndex === -1) return;
+            let prevIndex = currentIndex - 1;
+            if (prevIndex < 0) prevIndex = images.length - 1;
+            const prevFile = images[prevIndex];
+            this.lightboxLoading = true;
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${prevFile.id}/stream`;
+            } else {
+                src = `/api/files/${prevFile.id}/stream`;
+            }
+            this.imageViewer.src = src;
+            this.imageViewer.filename = prevFile.filename;
+            this.imageViewer.currentFile = prevFile;
+        },
+        nextImage() {
+            this.imageViewer.transitionDirection = 'next';
+            if (this.imageViewer.isSlideshow && this.imageViewer.slideshowFiles.length > 0) {
+                this.nextSlideshowImage();
+                return;
+            }
+            const images = this.imageFiles;
+            if (images.length <= 1 || !this.imageViewer.currentFile) return;
+            const currentIndex = images.findIndex(f => String(f.id) === String(this.imageViewer.currentFile.id));
+            if (currentIndex === -1) return;
+            let nextIndex = currentIndex + 1;
+            if (nextIndex >= images.length) nextIndex = 0;
+            const nextFile = images[nextIndex];
+            this.lightboxLoading = true;
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${nextFile.id}/stream`;
+            } else {
+                src = `/api/files/${nextFile.id}/stream`;
+            }
+            this.imageViewer.src = src;
+            this.imageViewer.filename = nextFile.filename;
+            this.imageViewer.currentFile = nextFile;
+        },
+        startSlideshow() {
+            if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                clearTimeout(this.imageViewer.slideshowInterval);
+            }
+            this.imageViewer.isSlideshow = true;
+            if (!this.lightboxLoading) {
+                this.imageViewer.slideshowInterval = setTimeout(() => {
+                    this.nextSlideshowImage();
+                }, this.imageViewer.slideshowSpeed);
+            } else {
+                this.imageViewer.slideshowInterval = 'waiting';
+            }
+        },
+        stopSlideshow() {
+            if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                clearTimeout(this.imageViewer.slideshowInterval);
+            }
+            this.imageViewer.slideshowInterval = null;
+            this.imageViewer.isSlideshow = false;
+        },
+        toggleSlideshow() {
+            if (this.imageViewer.slideshowInterval) {
+                this.stopSlideshow();
+            } else {
+                this.startSlideshow();
+            }
+        },
+        nextSlideshowImage() {
+            this.imageViewer.transitionDirection = 'next';
+            const files = this.imageViewer.slideshowFiles;
+            if (!files || files.length === 0) return;
+            // Only 1 image: reschedule timer without reloading (src unchanged → @load won't fire)
+            if (files.length === 1) {
+                if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                    clearTimeout(this.imageViewer.slideshowInterval);
+                }
+                if (this.imageViewer.slideshowInterval !== null) {
+                    this.imageViewer.slideshowInterval = setTimeout(() => {
+                        this.nextSlideshowImage();
+                    }, this.imageViewer.slideshowSpeed);
+                }
+                return;
+            }
+            let nextIndex = this.imageViewer.slideshowIndex + 1;
+            if (nextIndex >= files.length) nextIndex = 0;
+            this.imageViewer.slideshowIndex = nextIndex;
+            const nextFile = files[nextIndex];
+            
+            let wasPlaying = !!this.imageViewer.slideshowInterval;
+            if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                clearTimeout(this.imageViewer.slideshowInterval);
+            }
+            this.imageViewer.slideshowInterval = wasPlaying ? 'waiting' : null;
+
+            this.lightboxLoading = true;
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${nextFile.id}/stream`;
+            } else {
+                src = `/api/files/${nextFile.id}/stream`;
+            }
+            this.imageViewer.src = src;
+            this.imageViewer.filename = nextFile.filename;
+            this.imageViewer.currentFile = nextFile;
+        },
+        prevSlideshowImage() {
+            this.imageViewer.transitionDirection = 'prev';
+            const files = this.imageViewer.slideshowFiles;
+            if (!files || files.length === 0) return;
+            // Only 1 image: reschedule timer without reloading
+            if (files.length === 1) {
+                if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                    clearTimeout(this.imageViewer.slideshowInterval);
+                }
+                if (this.imageViewer.slideshowInterval !== null) {
+                    this.imageViewer.slideshowInterval = setTimeout(() => {
+                        this.nextSlideshowImage();
+                    }, this.imageViewer.slideshowSpeed);
+                }
+                return;
+            }
+            let prevIndex = this.imageViewer.slideshowIndex - 1;
+            if (prevIndex < 0) prevIndex = files.length - 1;
+            this.imageViewer.slideshowIndex = prevIndex;
+            const prevFile = files[prevIndex];
+            
+            let wasPlaying = !!this.imageViewer.slideshowInterval;
+            if (this.imageViewer.slideshowInterval && this.imageViewer.slideshowInterval !== 'waiting') {
+                clearTimeout(this.imageViewer.slideshowInterval);
+            }
+            this.imageViewer.slideshowInterval = wasPlaying ? 'waiting' : null;
+
+            this.lightboxLoading = true;
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${prevFile.id}/stream`;
+            } else {
+                src = `/api/files/${prevFile.id}/stream`;
+            }
+            this.imageViewer.src = src;
+            this.imageViewer.filename = prevFile.filename;
+            this.imageViewer.currentFile = prevFile;
+        },
+        startSelectedSlideshow() {
+            let slideshowFiles = [];
+            const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif'];
+            if (this.selectedIds && this.selectedIds.length > 0) {
+                let selectedFiles = this.files.filter(f => this.selectedIds.includes(f.id));
+                slideshowFiles = selectedFiles.filter(f => !f.is_folder && imgExts.includes(f.filename.split('.').pop().toLowerCase()));
+                if (slideshowFiles.length === 0) {
+                    this.showToast(this.t('slideshow_no_images_selected'), 'error');
+                    return;
+                }
+            } else {
+                slideshowFiles = this.imageFiles;
+                if (slideshowFiles.length === 0) {
+                    this.showToast(this.t('no_images_to_play'), 'error');
+                    return;
+                }
+            }
+            this.imageViewer.isSlideshow = true;
+            this.imageViewer.slideshowFiles = slideshowFiles;
+            this.imageViewer.slideshowIndex = 0;
+            this.imageViewer.slideshowSpeed = 5000;
+            const firstFile = slideshowFiles[0];
+            let src = '';
+            if (this.shareToken) {
+                src = `/s/${this.shareToken}/file/${firstFile.id}/stream`;
+            } else {
+                src = `/api/files/${firstFile.id}/stream`;
+            }
+            this.openImageViewer(src, firstFile.filename, firstFile);
+            this.startSlideshow();
         },
         saveComicProgress() {
             if (this.comicViewer.file && this.comicViewer.file.id) {
@@ -5160,7 +5692,7 @@ function shareApp() {
                         const savedChapter = file.id ? parseInt(localStorage.getItem(`epub-ch-${file.id}`) || '0') : 0;
                         this.epubViewer.currentChapter = Math.max(0, Math.min(savedChapter, this.epubViewer.spine.length - 1));
                         
-                        this._loadEpubChapter(file);
+                        this._loadEpubChapter(file, false, true);
                     } catch (err) {
                         console.error('EPUB meta failed:', err);
                         if (this.epubViewer.file && String(this.epubViewer.file.id) === String(file.id) && this.epubViewer.file.filename === file.filename) {
@@ -5199,7 +5731,7 @@ function shareApp() {
             }
             return baseParts.join('/');
         },
-        _loadEpubChapter(file, startAtBottom = false) {
+        _loadEpubChapter(file, startAtBottom = false, restoreScroll = false) {
             const chapter = this.epubViewer.spine[this.epubViewer.currentChapter];
             if (!chapter) return;
             
@@ -5241,7 +5773,7 @@ function shareApp() {
                 if (startAtBottom) {
                     try { win.scrollTo(0, doc.documentElement.scrollHeight || doc.body.scrollHeight || 999999); } catch(e) {}
                 } else {
-                    const savedScroll = file.id ? localStorage.getItem(`epub-scroll-${file.id}`) : null;
+                    const savedScroll = (restoreScroll && file.id) ? localStorage.getItem(`epub-scroll-${file.id}`) : null;
                     if (savedScroll) {
                         try { win.scrollTo(0, parseInt(savedScroll)); } catch(e) {}
                         localStorage.removeItem(`epub-scroll-${file.id}`);
@@ -5287,16 +5819,26 @@ function shareApp() {
         },
         nextEpubChapter() {
             if (this.epubViewer.currentChapter < this.epubViewer.spine.length - 1) {
-                this._saveEpubScroll();
                 this.epubViewer.currentChapter++;
-                this._loadEpubChapter(this.epubViewer.file, false);
+                if (this.epubViewer.file && this.epubViewer.file.id) {
+                    try {
+                        localStorage.setItem(`epub-ch-${this.epubViewer.file.id}`, this.epubViewer.currentChapter);
+                        localStorage.removeItem(`epub-scroll-${this.epubViewer.file.id}`);
+                    } catch(e) {}
+                }
+                this._loadEpubChapter(this.epubViewer.file, false, false);
             }
         },
         prevEpubChapter(startAtBottom = false) {
             if (this.epubViewer.currentChapter > 0) {
-                this._saveEpubScroll();
                 this.epubViewer.currentChapter--;
-                this._loadEpubChapter(this.epubViewer.file, startAtBottom);
+                if (this.epubViewer.file && this.epubViewer.file.id) {
+                    try {
+                        localStorage.setItem(`epub-ch-${this.epubViewer.file.id}`, this.epubViewer.currentChapter);
+                        localStorage.removeItem(`epub-scroll-${this.epubViewer.file.id}`);
+                    } catch(e) {}
+                }
+                this._loadEpubChapter(this.epubViewer.file, startAtBottom, false);
             }
         },
         _saveEpubScroll() {
@@ -5320,7 +5862,13 @@ function shareApp() {
             
             if (idx >= 0) {
                 this.epubViewer.currentChapter = idx;
-                this._loadEpubChapter(this.epubViewer.file, false);
+                if (this.epubViewer.file && this.epubViewer.file.id) {
+                    try {
+                        localStorage.setItem(`epub-ch-${this.epubViewer.file.id}`, this.epubViewer.currentChapter);
+                        localStorage.removeItem(`epub-scroll-${this.epubViewer.file.id}`);
+                    } catch(e) {}
+                }
+                this._loadEpubChapter(this.epubViewer.file, false, false);
                 if (fragment) {
                     setTimeout(() => {
                         const iframe = document.getElementById('epub-iframe');
@@ -6520,7 +7068,7 @@ function shareFileApp() {
                         const savedChapter = file.id ? parseInt(localStorage.getItem(`epub-ch-${file.id}`) || '0') : 0;
                         this.epubViewer.currentChapter = Math.max(0, Math.min(savedChapter, this.epubViewer.spine.length - 1));
                         
-                        this._loadEpubChapter(file);
+                        this._loadEpubChapter(file, false, true);
                     } catch (err) {
                         console.error('EPUB meta failed:', err);
                         if (this.epubViewer.file && String(this.epubViewer.file.id) === String(file.id) && this.epubViewer.file.filename === file.filename) {
@@ -6559,7 +7107,7 @@ function shareFileApp() {
             }
             return baseParts.join('/');
         },
-        _loadEpubChapter(file, startAtBottom = false) {
+        _loadEpubChapter(file, startAtBottom = false, restoreScroll = false) {
             const chapter = this.epubViewer.spine[this.epubViewer.currentChapter];
             if (!chapter) return;
             
@@ -6601,7 +7149,7 @@ function shareFileApp() {
                 if (startAtBottom) {
                     try { win.scrollTo(0, doc.documentElement.scrollHeight || doc.body.scrollHeight || 999999); } catch(e) {}
                 } else {
-                    const savedScroll = file.id ? localStorage.getItem(`epub-scroll-${file.id}`) : null;
+                    const savedScroll = (restoreScroll && file.id) ? localStorage.getItem(`epub-scroll-${file.id}`) : null;
                     if (savedScroll) {
                         try { win.scrollTo(0, parseInt(savedScroll)); } catch(e) {}
                         localStorage.removeItem(`epub-scroll-${file.id}`);
@@ -6647,16 +7195,26 @@ function shareFileApp() {
         },
         nextEpubChapter() {
             if (this.epubViewer.currentChapter < this.epubViewer.spine.length - 1) {
-                this._saveEpubScroll();
                 this.epubViewer.currentChapter++;
-                this._loadEpubChapter(this.epubViewer.file, false);
+                if (this.epubViewer.file && this.epubViewer.file.id) {
+                    try {
+                        localStorage.setItem(`epub-ch-${this.epubViewer.file.id}`, this.epubViewer.currentChapter);
+                        localStorage.removeItem(`epub-scroll-${this.epubViewer.file.id}`);
+                    } catch(e) {}
+                }
+                this._loadEpubChapter(this.epubViewer.file, false, false);
             }
         },
         prevEpubChapter(startAtBottom = false) {
             if (this.epubViewer.currentChapter > 0) {
-                this._saveEpubScroll();
                 this.epubViewer.currentChapter--;
-                this._loadEpubChapter(this.epubViewer.file, startAtBottom);
+                if (this.epubViewer.file && this.epubViewer.file.id) {
+                    try {
+                        localStorage.setItem(`epub-ch-${this.epubViewer.file.id}`, this.epubViewer.currentChapter);
+                        localStorage.removeItem(`epub-scroll-${this.epubViewer.file.id}`);
+                    } catch(e) {}
+                }
+                this._loadEpubChapter(this.epubViewer.file, startAtBottom, false);
             }
         },
         _saveEpubScroll() {
@@ -6680,7 +7238,13 @@ function shareFileApp() {
             
             if (idx >= 0) {
                 this.epubViewer.currentChapter = idx;
-                this._loadEpubChapter(this.epubViewer.file, false);
+                if (this.epubViewer.file && this.epubViewer.file.id) {
+                    try {
+                        localStorage.setItem(`epub-ch-${this.epubViewer.file.id}`, this.epubViewer.currentChapter);
+                        localStorage.removeItem(`epub-scroll-${this.epubViewer.file.id}`);
+                    } catch(e) {}
+                }
+                this._loadEpubChapter(this.epubViewer.file, false, false);
                 if (fragment) {
                     setTimeout(() => {
                         const iframe = document.getElementById('epub-iframe');

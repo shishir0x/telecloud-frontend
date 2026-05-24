@@ -294,7 +294,7 @@ const TeleCloud = window.TeleCloud = {
             const finalSrc = (hasThumb) ? thumbUrl : streamUrl;
             if (!finalSrc) return '';
 
-            return `<img src="${finalSrc}" alt="${safeFilename}" class="max-h-64 object-contain rounded-[1rem] w-full shadow-md cursor-zoom-in ${isBlur} opacity-0 scale-95 transition-all duration-700 transform" onload="this.classList.remove('opacity-0', 'scale-95'); this.classList.add('opacity-100', 'scale-100')" onerror="this.style.display='none'" ${lbAttr} ${clickHandler}>`;
+            return `<img src="${finalSrc}" alt="${safeFilename}" data-lightbox-id="${id}" class="max-h-64 object-contain rounded-[1rem] w-full shadow-md cursor-zoom-in ${isBlur} opacity-0 scale-95 transition-all duration-700 transform" onload="this.classList.remove('opacity-0', 'scale-95'); this.classList.add('opacity-100', 'scale-100')" onerror="this.style.display='none'" ${lbAttr} ${clickHandler}>`;
         } else if (videoExts.includes(ext)) {
             if (this.isAppleDevice() && ext === 'mkv') {
                 return `
