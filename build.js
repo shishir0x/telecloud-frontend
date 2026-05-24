@@ -112,7 +112,8 @@ async function main() {
 
   function buildTailwind() {
     return new Promise((resolve, reject) => {
-      execFile('bunx', ['@tailwindcss/cli', '-i', 'static/css/input.css', '-o', 'static/css/tailwind.css', '--minify'],
+      const tailwindBin = path.join('node_modules', '.bin', 'tailwindcss');
+      execFile('bun', ['run', tailwindBin, '-i', 'static/css/input.css', '-o', 'static/css/tailwind.css', '--minify'],
         { stdio: 'inherit', shell: process.platform === 'win32' },
         (err) => err ? reject(err) : resolve()
       );
