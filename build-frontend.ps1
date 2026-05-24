@@ -24,10 +24,22 @@ if ($TELECLOUD_PULL_LATEST -eq "1") {
 }
 
 Write-Host "Ensuring bun is installed..."
+$BunPath = "$env:USERPROFILE\.bun\bin"
+if (Test-Path $BunPath) {
+    if ($env:PATH -notlike "*$BunPath*") {
+        $env:PATH = "$BunPath;$env:PATH"
+    }
+}
+
 if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
     Write-Host "bun is not installed. Installing bun..."
     try {
         irm bun.sh/install.ps1 | iex
+        if (Test-Path $BunPath) {
+            if ($env:PATH -notlike "*$BunPath*") {
+                $env:PATH = "$BunPath;$env:PATH"
+            }
+        }
     } catch {
         Write-Error "Failed to install bun. Please install it manually from https://bun.com/ and try again."
         exit 1

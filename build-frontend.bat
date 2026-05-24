@@ -22,7 +22,10 @@ if "%TELECLOUD_PULL_LATEST%"=="1" (
     echo Set TELECLOUD_PULL_LATEST=1 to explicitly pull origin/main before building.
 )
 
-echo Ensuring bun is installed...
+if exist "%USERPROFILE%\.bun\bin" (
+    set "PATH=%USERPROFILE%\.bun\bin;%PATH%"
+)
+
 where bun >nul 2>&1
 if errorlevel 1 (
   echo bun is not installed. Installing bun...
@@ -30,6 +33,9 @@ if errorlevel 1 (
   if errorlevel 1 (
     echo Failed to install bun. Please install it manually from https://bun.com/ and try again.
     exit /b 1
+  )
+  if exist "%USERPROFILE%\.bun\bin" (
+      set "PATH=%USERPROFILE%\.bun\bin;%PATH%"
   )
 )
 
