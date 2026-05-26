@@ -23,6 +23,37 @@
         .pdf-canvas-invert {
             filter: invert(1) hue-rotate(180deg) !important;
         }
+        #app-preloader {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #090d16; /* Slate 950 fallback */
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s;
+        }
+        /* Custom spinner fallback to render immediately without external resources */
+        .preloader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(59, 130, 246, 0.1);
+            border-radius: 50%;
+            border-top-color: #3b82f6;
+            animation: preloader-spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+        @keyframes preloader-spin {
+            to { transform: rotate(360deg); }
+        }
+        .preloader-hidden {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+        body.preloader-active {
+            overflow: hidden !important;
+        }
     </style>
 
 
@@ -40,9 +71,28 @@
     {{ end }}
 </head>
 
-<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen relative overflow-x-hidden flex flex-col transition-colors duration-500" 
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen relative overflow-x-hidden flex flex-col transition-colors duration-500 preloader-active" 
       :data-theme="currentTheme"
       x-data="shareFileApp()">
+
+    <!-- App Preloader Overlay -->
+    <div id="app-preloader" class="bg-slate-50 dark:bg-slate-950">
+        <div class="flex flex-col items-center gap-4">
+            <!-- Pulsing outer circle -->
+            <div class="relative w-20 h-20 flex items-center justify-center">
+                <!-- Inner spinner -->
+                <div class="preloader-spinner"></div>
+                <div class="absolute w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                    <i class="fa-solid fa-cloud text-white text-base"></i>
+                </div>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-center px-4">
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">TeleCloud OS</h1>
+                <span class="text-xs text-slate-400 dark:text-slate-500 font-medium">Loading share file...</span>
+            </div>
+        </div>
+    </div>
+
     <span x-ref="token" class="hidden">{{ .token }}</span>
     <span x-ref="id" class="hidden">{{ .id }}</span>
     <span x-ref="size" class="hidden">{{ .size }}</span>
@@ -120,6 +170,19 @@
                             <span x-text="t('date') + ':'"></span>
                             <span class="font-bold text-slate-800 dark:text-slate-200" x-text="TeleCloud.formatDate($refs.rawDate.textContent, lang)"></span>
                             <span x-ref="rawDate" class="hidden">{{ .created_at }}</span>
+                        </div>
+                        <div class="h-px w-full bg-slate-200/50 dark:bg-slate-700/50"></div>
+                        <div class="flex justify-between items-center text-xs text-slate-500 font-medium">
+                            <div class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-eye text-slate-400 dark:text-slate-500"></i>
+                                <span x-text="t('view_count') + ':'"></span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200">{{ .share_views }}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <i class="fa-solid fa-cloud-arrow-down text-slate-400 dark:text-slate-500"></i>
+                                <span x-text="t('download_count') + ':'"></span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200">{{ .share_downloads }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>

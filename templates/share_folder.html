@@ -25,6 +25,37 @@
         .pdf-canvas-invert {
             filter: invert(1) hue-rotate(180deg) !important;
         }
+        #app-preloader {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #090d16; /* Slate 950 fallback */
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s;
+        }
+        /* Custom spinner fallback to render immediately without external resources */
+        .preloader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(59, 130, 246, 0.1);
+            border-radius: 50%;
+            border-top-color: #3b82f6;
+            animation: preloader-spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+        @keyframes preloader-spin {
+            to { transform: rotate(360deg); }
+        }
+        .preloader-hidden {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+        body.preloader-active {
+            overflow: hidden !important;
+        }
     </style>
 
 
@@ -40,8 +71,26 @@
 </head>
 
 <body
-    class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 h-full relative overflow-hidden flex flex-col transition-colors duration-500"
+    class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 h-full relative overflow-hidden flex flex-col transition-colors duration-500 preloader-active"
     :data-theme="currentTheme" x-data="shareApp()">
+
+    <!-- App Preloader Overlay -->
+    <div id="app-preloader" class="bg-slate-50 dark:bg-slate-950">
+        <div class="flex flex-col items-center gap-4">
+            <!-- Pulsing outer circle -->
+            <div class="relative w-20 h-20 flex items-center justify-center">
+                <!-- Inner spinner -->
+                <div class="preloader-spinner"></div>
+                <div class="absolute w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                    <i class="fa-solid fa-cloud text-white text-base"></i>
+                </div>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-center px-4">
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">TeleCloud OS</h1>
+                <span class="text-xs text-slate-400 dark:text-slate-500 font-medium">Loading shared folder...</span>
+            </div>
+        </div>
+    </div>
 
     <span x-ref="token" class="hidden">{{ .token }}</span>
 
@@ -344,9 +393,24 @@
             <header
                 class="flex items-center justify-between p-3 md:px-6 md:py-4 border-b border-slate-200 dark:border-white/5 bg-white/30 dark:bg-slate-900/30 gap-4 shrink-0 relative z-[200]">
                 <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-cloud text-blue-600 dark:text-blue-400 text-2xl"></i>
-                        <span class="font-bold text-lg sm:block">{{ .filename }}</span>
+                    <div class="flex flex-col">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-cloud text-blue-600 dark:text-blue-400 text-2xl"></i>
+                            <span class="font-bold text-lg sm:block">{{ .filename }}</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap font-medium">
+                            <div class="flex items-center gap-1">
+                                <i class="fa-solid fa-eye text-slate-400 dark:text-slate-500"></i>
+                                <span x-text="t('view_count') + ':'"></span>
+                                <span class="font-bold text-slate-700 dark:text-slate-350">{{ .share_views }}</span>
+                            </div>
+                            <span class="text-slate-300 dark:text-slate-750 font-normal">•</span>
+                            <div class="flex items-center gap-1">
+                                <i class="fa-solid fa-cloud-arrow-down text-slate-400 dark:text-slate-500"></i>
+                                <span x-text="t('download_count') + ':'"></span>
+                                <span class="font-bold text-slate-700 dark:text-slate-350">{{ .share_downloads }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -439,7 +503,7 @@
                 <!-- Unified Table Header -->
                 <div x-show="files.length > 0 && !isLoading && viewMode === 'list'"
                     class="grid grid-cols-12 gap-4 px-4 md:px-10 py-3 text-[10px] md:text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-t border-slate-200/50 dark:border-white/5">
-                    <div class="col-span-8 md:col-span-5 flex items-center gap-3 cursor-pointer select-none group"
+                    <div class="col-span-10 md:col-span-5 flex items-center gap-3 cursor-pointer select-none group"
                         @click="toggleSort('name')">
                         <input type="checkbox" class="w-4 h-4 accent-blue-600 cursor-pointer rounded" @click.stop
                             @change="
@@ -465,7 +529,7 @@
                         <i class="fa-solid"
                             :class="sortBy === 'size' ? (sortOrder === 'asc' ? 'fa-sort-up text-blue-500' : 'fa-sort-down text-blue-500') : 'fa-sort opacity-0 group-hover:opacity-40 transition-opacity'"></i>
                     </div>
-                    <div class="col-span-4 md:col-span-2 text-right md:text-center" x-text="t('actions')"></div>
+                    <div class="col-span-2 md:col-span-2 text-right md:text-center" x-text="t('actions')"></div>
                 </div>
             </div>
 
@@ -496,7 +560,7 @@
                                                 x-transition.opacity.duration.300ms>
 
                                                 <div
-                                                    class="col-span-8 md:col-span-5 flex items-center gap-3 w-full truncate">
+                                                    class="col-span-10 md:col-span-5 flex items-center gap-3 w-full truncate">
                                                     <div class="w-4 h-4 shrink-0 flex items-center justify-center">
                                                         <input type="checkbox" :value="file.id"
                                                             x-model.number="selectedIds" x-show="!file.is_folder"
@@ -549,7 +613,7 @@
                                                     x-text="file.is_folder ? t('folder') : formatBytes(file.size)">
                                                 </div>
 
-                                                <div class="col-span-4 md:col-span-2 flex justify-end md:justify-center relative"
+                                                <div class="col-span-2 md:col-span-2 flex justify-end md:justify-center relative"
                                                     @click.outside="if (openMenuId === file.id) openMenuId = null">
                                                     <button
                                                         @click.stop="openMenuId = openMenuId === file.id ? null : file.id"

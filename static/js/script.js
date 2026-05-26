@@ -494,6 +494,16 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         isRefreshing: false,
         isTrashLoading: false,
         isPreparingDownload: false,
+        sharedLinksModal: false,
+        sharePasswordModal: false,
+        sharePasswordFile: null,
+        sharePasswordEnabled: false,
+        sharePasswordInput: '',
+        sharedLinks: [],
+        isSharedLinksLoading: false,
+        sharedLinksSearchQuery: '',
+        sharedLinksCurrentPage: 1,
+        sharedLinksItemsPerPage: 10,
         trashFiles: [],
         trashSearchQuery: '',
         trashCurrentPage: 1,
@@ -1164,6 +1174,18 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             const start = (this.trashCurrentPage - 1) * this.trashItemsPerPage;
             return this.filteredTrashFiles.slice(start, start + this.trashItemsPerPage);
         },
+        get filteredSharedLinks() {
+            if (!this.sharedLinksSearchQuery) return this.sharedLinks;
+            const q = this.sharedLinksSearchQuery.toLowerCase();
+            return this.sharedLinks.filter(f => f.filename.toLowerCase().includes(q) || f.path.toLowerCase().includes(q));
+        },
+        get sharedLinksTotalPages() {
+            return Math.ceil(this.filteredSharedLinks.length / this.sharedLinksItemsPerPage) || 1;
+        },
+        get displayedSharedLinks() {
+            const start = (this.sharedLinksCurrentPage - 1) * this.sharedLinksItemsPerPage;
+            return this.filteredSharedLinks.slice(start, start + this.sharedLinksItemsPerPage);
+        },
         get displayedFiles() {
             const start = (this.currentPage - 1) * this.itemsPerPage;
             const end = start + this.itemsPerPage;
@@ -1349,6 +1371,18 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     }
                 });
             }
+
+            // Fade out preloader once Alpine has finished loading the initial view
+            this.$nextTick(() => {
+                setTimeout(() => {
+                    const preloader = document.getElementById('app-preloader');
+                    if (preloader) {
+                        preloader.classList.add('preloader-hidden');
+                        setTimeout(() => preloader.remove(), 400);
+                    }
+                    document.body.classList.remove('preloader-active');
+                }, 150);
+            });
         },
         async checkUpdate() {
             const compareVersions = (v1, v2) => {
@@ -1857,6 +1891,52 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 const elapsed = Date.now() - startTime;
                 if (elapsed < 500) await new Promise(r => setTimeout(r, 500 - elapsed));
                 this.isTrashLoading = false;
+            }
+        },
+        openSharedLinksModal() {
+            this.sharedLinksModal = true;
+            this.fetchSharedLinks();
+        },
+        async fetchSharedLinks() {
+            if (this.isSharedLinksLoading) return;
+            const startTime = Date.now();
+            this.isSharedLinksLoading = true;
+            try {
+                const res = await fetch('/api/shares');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.sharedLinks = data.files || [];
+                }
+            } catch (e) {
+                console.error('Fetch shares error', e);
+            } finally {
+                const elapsed = Date.now() - startTime;
+                if (elapsed < 500) await new Promise(r => setTimeout(r, 500 - elapsed));
+                this.isSharedLinksLoading = false;
+            }
+        },
+        async revokeSharedLinkFromModal(file) {
+            const confirmed = await this.customConfirm(
+                this.t('revoke_confirm_title') || 'Revoke Link',
+                this.t('revoke_confirm_msg') || 'Are you sure you want to revoke this share link? Others will no longer be able to access it.',
+                true
+            );
+            if (!confirmed) return;
+            try {
+                const res = await fetch(`/api/files/${file.id}/share`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() }
+                });
+                if (res.ok) {
+                    this.showToast(this.t('toast_revoked'), 'success');
+                    this.sharedLinks = this.sharedLinks.filter(f => f.id !== file.id);
+                    this.fetchFiles(true);
+                } else {
+                    const d = await res.json();
+                    this.showToast(this.handleCommonError(d.error, 'status_error'), 'error');
+                }
+            } catch (e) {
+                this.showToast(this.t('conn_error'), 'error');
             }
         },
         async restoreFile(id) {
@@ -2904,23 +2984,39 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                         this.showToast(this.handleCommonError(data.error, 'status_error'), 'error');
                     }
                 } else {
-                    const password = await this.customPrompt(this.t('share_password_prompt'), "");
-                    targetFile.share_token = 'loading...';
-                    const fd = new FormData();
-                    if (password) fd.append('password', password);
-                    const response = await fetch(`/api/files/${file.id}/share`, { method: 'POST', body: fd, headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() } });
-                    if (response.ok) {
-                        const data = await response.json();
-                        targetFile.share_token = data.share_token;
-                        targetFile.direct_token = data.direct_token;
-                        targetFile.has_share_password = !!password;
-                        this.copyShareLink(targetFile, 'regular');
-                    } else {
-                        targetFile.share_token = null;
-                        const data = await response.json();
-                        this.showToast(this.handleCommonError(data.error, 'status_error'), 'error');
-                    }
+                    this.sharePasswordFile = targetFile;
+                    this.sharePasswordEnabled = false;
+                    this.sharePasswordInput = '';
+                    this.sharePasswordModal = true;
                 }
+            }
+        },
+        async confirmCreateShare() {
+            if (!this.sharePasswordFile) return;
+            const targetFile = this.sharePasswordFile;
+            const password = this.sharePasswordEnabled ? this.sharePasswordInput.trim() : '';
+            this.sharePasswordModal = false;
+            
+            targetFile.share_token = 'loading...';
+            const fd = new FormData();
+            if (password) fd.append('password', password);
+            try {
+                const response = await fetch(`/api/files/${targetFile.id}/share`, { method: 'POST', body: fd, headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() } });
+                if (response.ok) {
+                    const data = await response.json();
+                    targetFile.share_token = data.share_token;
+                    targetFile.direct_token = data.direct_token;
+                    targetFile.has_share_password = !!password;
+                    this.copyShareLink(targetFile, 'regular');
+                } else {
+                    targetFile.share_token = null;
+                    const data = await response.json();
+                    this.showToast(this.handleCommonError(data.error, 'status_error'), 'error');
+                }
+            } catch (err) {
+                targetFile.share_token = null;
+                console.error(err);
+                this.showToast(this.t('status_error'), 'error');
             }
         },
         async copyShareLink(file, type = 'regular') {
@@ -5112,6 +5208,18 @@ function shareApp() {
             TeleCloud.initTheme('system');
 
             this.fetchFiles(false);
+
+            // Fade out preloader once Alpine has finished loading the initial view
+            this.$nextTick(() => {
+                setTimeout(() => {
+                    const preloader = document.getElementById('app-preloader');
+                    if (preloader) {
+                        preloader.classList.add('preloader-hidden');
+                        setTimeout(() => preloader.remove(), 400);
+                    }
+                    document.body.classList.remove('preloader-active');
+                }, 150);
+            });
         },
         openContextMenu(e, file) {
             if (!file) return; 
@@ -8163,6 +8271,16 @@ function shareFileApp() {
                         }, 15000);
                     });
                 }
+
+                // Fade out preloader once initial calculation and layout changes are complete
+                setTimeout(() => {
+                    const preloader = document.getElementById('app-preloader');
+                    if (preloader) {
+                        preloader.classList.add('preloader-hidden');
+                        setTimeout(() => preloader.remove(), 400);
+                    }
+                    document.body.classList.remove('preloader-active');
+                }, 150);
             });
         }
     }

@@ -26,6 +26,37 @@
         .pdf-canvas-invert {
             filter: invert(1) hue-rotate(180deg) !important;
         }
+        #app-preloader {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #090d16; /* Slate 950 fallback */
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s;
+        }
+        /* Custom spinner fallback to render immediately without external resources */
+        .preloader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(59, 130, 246, 0.1);
+            border-radius: 50%;
+            border-top-color: #3b82f6;
+            animation: preloader-spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+        @keyframes preloader-spin {
+            to { transform: rotate(360deg); }
+        }
+        .preloader-hidden {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+        body.preloader-active {
+            overflow: hidden !important;
+        }
     </style>
 
 
@@ -44,10 +75,28 @@
 </head>
 
 <body
-    class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 h-full relative overflow-hidden flex flex-col transition-colors duration-500"
+    class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 h-full relative overflow-hidden flex flex-col transition-colors duration-500 preloader-active"
     :data-theme="currentTheme"
     x-data="cloudApp(true, {{ if .is_admin }}true{{ else }}false{{ end }}, {{ .storage_used }}, {{ if .webdav_enabled }}true{{ else }}false{{ end }}, '{{ .webdav_user }}', '{{ .webdav_password }}', {{ if .upload_api_enabled }}true{{ else }}false{{ end }}, '{{ .upload_api_key }}', {{ if .global_webdav_enabled }}true{{ else }}false{{ end }}, {{ if .global_api_enabled }}true{{ else }}false{{ end }}, '{{ .webauthn_rpid }}', '{{ .webauthn_rporigin }}', '{{ .theme }}', {{ if .s3_enabled }}true{{ else }}false{{ end }}, '{{ .s3_access_key }}', '{{ .s3_secret_key }}', {{ if .global_s3_enabled }}true{{ else }}false{{ end }}, {{ if .force_change }}true{{ else }}false{{ end }}, '{{ .log_group_id }}', '{{ .bot_tokens }}', '{{ .bot_statuses }}')"
     @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false" @drop.prevent="handleDrop($event)">
+
+    <!-- App Preloader Overlay -->
+    <div id="app-preloader" class="bg-slate-50 dark:bg-slate-950">
+        <div class="flex flex-col items-center gap-4">
+            <!-- Pulsing outer circle -->
+            <div class="relative w-20 h-20 flex items-center justify-center">
+                <!-- Inner spinner -->
+                <div class="preloader-spinner"></div>
+                <div class="absolute w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                    <i class="fa-solid fa-cloud text-white text-base"></i>
+                </div>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-center px-4">
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">TeleCloud OS</h1>
+                <span class="text-xs text-slate-400 dark:text-slate-500 font-medium">Loading workspace files...</span>
+            </div>
+        </div>
+    </div>
 
     <div class="blob-1"></div>
     <div class="blob-2"></div>
@@ -191,6 +240,149 @@
         </div>
     </div>
 
+    <!-- ===== Shared Links Directory Modal ===== -->
+    <div x-show="sharedLinksModal" x-cloak
+        class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+        x-transition.opacity>
+        <div @click.outside="sharedLinksModal = false"
+            class="glass-menu w-[95%] max-w-2xl max-h-[85vh] rounded-[2rem] p-6 shadow-2xl animate-modal-in border border-white/20 flex flex-col overflow-hidden">
+            
+            <div class="flex justify-between items-center mb-5 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                        <i class="fa-solid fa-link text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-900 dark:text-white" x-text="t('shared_links_title')"></h3>
+                        <p class="text-xs text-slate-500" x-text="t('showing') + ' ' + sharedLinks.length + ' ' + t('items_suffix')"></p>
+                    </div>
+                </div>
+                <button @click="sharedLinksModal = false"
+                    class="text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 p-1.5 rounded-full transition-colors shrink-0">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Search bar inside Shared Links Modal -->
+            <div class="mb-4 shrink-0 relative group" x-show="sharedLinks.length > 0 || sharedLinksSearchQuery">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                    <i class="fa-solid fa-magnifying-glass text-slate-400 group-focus-within:text-emerald-500 transition-colors"></i>
+                </div>
+                <input type="text" x-model="sharedLinksSearchQuery" @input="sharedLinksCurrentPage = 1"
+                    :placeholder="t('search_placeholder')"
+                    class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-800 dark:text-slate-200 transition-all text-sm shadow-sm">
+            </div>
+
+            <!-- Loader -->
+            <div x-show="isSharedLinksLoading" class="flex-1 flex flex-col items-center justify-center py-12 shrink-0">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-emerald-500 mb-3"></i>
+                <p class="text-sm text-slate-500" x-text="t('loading')"></p>
+            </div>
+
+            <!-- Content list -->
+            <div x-show="!isSharedLinksLoading" class="flex-1 overflow-y-auto pr-1 -mr-2 space-y-3 min-h-0">
+                <template x-for="file in displayedSharedLinks" :key="file.id">
+                    <div class="p-3.5 rounded-2xl bg-white/40 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-700/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all">
+                        <!-- Left section: icon, name, path -->
+                        <div class="flex items-center gap-3.5 min-w-0 flex-1 w-full">
+                            <div class="w-11 h-11 flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-sm shrink-0">
+                                <template x-if="file.is_folder">
+                                    <i class="fa-solid fa-folder text-amber-400 text-2xl drop-shadow-sm"></i>
+                                </template>
+                                <template x-if="!file.is_folder">
+                                    <div class="w-full h-full relative flex items-center justify-center">
+                                        <template x-if="file.has_thumb">
+                                            <img :src="`/api/files/${file.id}/thumb`" loading="lazy" alt="thumb" class="w-full h-full object-cover rounded-xl shadow-sm">
+                                        </template>
+                                        <template x-if="!file.has_thumb">
+                                            <div x-html="getFileTypeData(file.filename).i" class="scale-75 opacity-80" :class="getFileTypeData(file.filename).c.split(' ')[1]"></div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="min-w-0 flex-1 flex flex-col">
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="text-sm font-bold text-slate-800 dark:text-slate-200 truncate" x-text="file.filename" :title="file.filename"></p>
+                                    <template x-if="file.has_share_password">
+                                        <span class="inline-flex shrink-0 items-center px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20" title="Password Protected">
+                                            <i class="fa-solid fa-lock text-[8px]"></i>
+                                        </span>
+                                    </template>
+                                </div>
+                                <div class="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400 font-medium truncate flex-wrap">
+                                    <span x-text="file.path"></span>
+                                    <span class="text-slate-300 dark:text-slate-700">•</span>
+                                    <span class="flex items-center gap-1">
+                                        <i class="fa-solid fa-eye text-slate-450 dark:text-slate-500"></i>
+                                        <span x-text="file.share_views || 0"></span>
+                                    </span>
+                                    <span class="text-slate-300 dark:text-slate-700">•</span>
+                                    <span class="flex items-center gap-1">
+                                        <i class="fa-solid fa-cloud-arrow-down text-slate-450 dark:text-slate-500"></i>
+                                        <span x-text="file.share_downloads || 0"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right section: action buttons -->
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
+                            <!-- Copy regular share link -->
+                            <button @click="copyShareLink(file, 'regular')" :title="t('copy_share_link')"
+                                class="px-3 py-2 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95">
+                                <i class="fa-solid fa-share-nodes"></i>
+                                <span class="hidden sm:inline" x-text="t('copy')"></span>
+                            </button>
+                            <!-- Copy direct link (only for files without password) -->
+                            <template x-if="!file.is_folder && !file.has_share_password">
+                                <button @click="copyShareLink(file, 'direct')" :title="t('copy_direct_link')"
+                                    class="px-3 py-2 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95">
+                                    <i class="fa-solid fa-download"></i>
+                                    <span class="hidden sm:inline">Direct</span>
+                                </button>
+                            </template>
+                            <!-- Revoke button -->
+                            <button @click="revokeSharedLinkFromModal(file)" :title="t('revoke_link')"
+                                class="px-3 py-2 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span class="hidden sm:inline" x-text="t('remove')"></span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Empty list template -->
+                <template x-if="filteredSharedLinks.length === 0">
+                    <div class="flex flex-col items-center justify-center py-16 text-slate-400">
+                        <div class="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-link-slash text-2xl text-slate-300 dark:text-slate-600"></i>
+                        </div>
+                        <p class="text-sm font-medium text-center px-4" x-text="sharedLinksSearchQuery ? t('no_results') + ' &quot;' + sharedLinksSearchQuery + '&quot;' : t('no_shared_links')"></p>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Pagination inside Shared Links Modal -->
+            <div x-show="sharedLinksTotalPages > 1" x-cloak
+                class="flex items-center justify-between pt-4 mt-3 border-t border-slate-200/50 dark:border-slate-700/50 shrink-0">
+                <button @click="if(sharedLinksCurrentPage > 1) sharedLinksCurrentPage--"
+                    :disabled="sharedLinksCurrentPage === 1"
+                    class="px-3.5 py-2 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 active:scale-95 text-slate-700 dark:text-white">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    <span x-text="sharedLinksCurrentPage"></span> / <span x-text="sharedLinksTotalPages"></span>
+                </span>
+                <button @click="if(sharedLinksCurrentPage < sharedLinksTotalPages) sharedLinksCurrentPage++"
+                    :disabled="sharedLinksCurrentPage === sharedLinksTotalPages"
+                    class="px-3.5 py-2 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 active:scale-95 text-slate-700 dark:text-white">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+            
+        </div>
+    </div>
+
     <div x-show="modal.show" x-cloak
         class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
         x-transition.opacity>
@@ -298,6 +490,101 @@
         </div>
     </div>
 
+    <!-- Share Password Modal -->
+    <div x-show="sharePasswordModal" x-cloak
+        class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+        x-transition.opacity>
+        <div @click.outside="sharePasswordModal = false"
+            class="glass-menu w-[90%] max-w-md rounded-[2rem] p-6 shadow-2xl animate-modal-in border border-white/20">
+            
+            <!-- Header with a secure gradient lock bubble -->
+            <div class="flex items-center gap-4 mb-5 p-4 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-2xl border border-blue-100/20 dark:border-blue-800/10">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/25">
+                    <i class="fa-solid fa-share-nodes text-white text-lg"></i>
+                </div>
+                <div class="flex flex-col min-w-0">
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white" x-text="t('share_modal_title')"></h3>
+                    <span class="text-xs text-slate-500 dark:text-slate-400" x-text="t('share_modal_subtitle')"></span>
+                </div>
+            </div>
+
+            <!-- File/Folder representation -->
+            <div class="mb-5 p-3 rounded-xl bg-slate-50/50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                <template x-if="sharePasswordFile">
+                    <div class="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-sm shrink-0 overflow-hidden">
+                        <template x-if="sharePasswordFile.is_folder">
+                            <i class="fa-solid fa-folder text-amber-400 text-2xl drop-shadow-sm"></i>
+                        </template>
+                        <template x-if="!sharePasswordFile.is_folder">
+                            <div class="w-full h-full relative flex items-center justify-center">
+                                <template x-if="sharePasswordFile.has_thumb">
+                                    <img :src="`/api/files/${sharePasswordFile.id}/thumb`"
+                                        loading="lazy" alt="thumb"
+                                        class="w-full h-full object-cover rounded-xl shadow-sm">
+                                </template>
+                                <template x-if="!sharePasswordFile.has_thumb">
+                                    <div x-html="getFileTypeData(sharePasswordFile.filename).i"
+                                        class="scale-75 opacity-80"
+                                        :class="getFileTypeData(sharePasswordFile.filename).c.split(' ')[1]">
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+                <div class="flex flex-col min-w-0 flex-1">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider" x-text="t('share_modal_file')"></span>
+                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate" x-text="sharePasswordFile?.filename"></span>
+                </div>
+            </div>
+
+            <!-- Toggle Password Security -->
+            <div class="flex items-center justify-between p-4 bg-white/60 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 transition-colors shadow-sm">
+                <div class="flex flex-col gap-1 pr-4">
+                    <span class="text-sm font-semibold text-slate-800 dark:text-slate-200" x-text="t('share_password_enable')"></span>
+                    <span class="text-[11px] text-slate-500 dark:text-slate-450 leading-normal" x-text="t('share_password_enable_desc')"></span>
+                </div>
+                <button type="button" 
+                    @click="sharePasswordEnabled = !sharePasswordEnabled; if(sharePasswordEnabled) { setTimeout(() => $refs.sharePasswordInput?.focus(), 150) }"
+                    class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 shadow-sm"
+                    :class="sharePasswordEnabled ? 'bg-blue-600 border-blue-600' : 'bg-slate-300 dark:bg-slate-600 border-slate-300 dark:border-slate-600'">
+                    <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out"
+                        :class="sharePasswordEnabled ? 'translate-x-5' : 'translate-x-0'"></span>
+                </button>
+            </div>
+
+            <!-- Password Input with smooth toggle animation -->
+            <div x-show="sharePasswordEnabled" 
+                x-transition:enter="transition ease-out duration-200" 
+                x-transition:enter-start="opacity-0 -translate-y-2" 
+                x-transition:enter-end="opacity-100 translate-y-0" 
+                class="mt-4 space-y-2">
+                <label class="text-xs font-semibold text-slate-500 dark:text-slate-400 block px-1" x-text="t('share_password_label')"></label>
+                <div class="relative flex items-center">
+                    <div class="absolute left-4 text-slate-400 dark:text-slate-500">
+                        <i class="fa-solid fa-key"></i>
+                    </div>
+                    <input type="text" x-model="sharePasswordInput" x-ref="sharePasswordInput"
+                        :placeholder="t('share_password_placeholder')"
+                        @keydown.enter="confirmCreateShare()"
+                        class="w-full pl-11 pr-4 py-3 rounded-xl bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white transition-all text-sm">
+                </div>
+            </div>
+
+            <!-- Footer Action Buttons -->
+            <div class="flex gap-3 mt-6">
+                <button @click="sharePasswordModal = false"
+                    class="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold transition-all text-sm text-center"
+                    x-text="t('share_cancel_btn')"></button>
+                <button @click="confirmCreateShare()"
+                    class="flex-1 py-3 px-4 rounded-xl text-white font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-500/25 transition-all text-sm text-center active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-link"></i>
+                    <span x-text="t('share_create_btn')"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div x-show="contextMenu.show" x-cloak @click.outside="closeContextMenu" @contextmenu.prevent="closeContextMenu"
         :style="`top: ${contextMenu.y}px; left: ${contextMenu.x}px;`"
         class="fixed glass-menu z-[100] w-52 rounded-2xl p-1.5 text-sm shadow-2xl" x-transition.opacity.duration.200ms>
@@ -325,7 +612,7 @@
                         <template x-if="!contextMenu.file.is_folder && !contextMenu.file.has_share_password">
                             <button @click="copyShareLink(contextMenu.file, 'direct'); closeContextMenu()"
                                 class="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-medium transition-colors text-xs">
-                                <i class="fa-solid fa-copy fa-fw"></i> <span x-text="t('copy_direct_link')"></span>
+                                <i class="fa-solid fa-download fa-fw"></i> <span x-text="t('copy_direct_link')"></span>
                             </button>
                         </template>
                     </div>
@@ -537,7 +824,7 @@
                             <template x-if="!fileInfoModal.file?.is_folder && !fileInfoModal.file?.has_share_password">
                                 <button @click="copyShareLink(fileInfoModal.file, 'direct')"
                                     class="flex flex-col items-center justify-center gap-1 p-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 text-blue-600 font-medium transition-colors text-xs">
-                                    <i class="fa-solid fa-copy text-base mb-0.5"></i>
+                                    <i class="fa-solid fa-download text-base mb-0.5"></i>
                                     <span x-text="t('copy_direct_link')"></span>
                                 </button>
                             </template>
@@ -783,6 +1070,11 @@
                         <i class="fa-solid fa-play"></i>
                         <span class="hidden sm:inline" x-text="t('slideshow')"></span>
                     </button>
+                    <button @click="openSharedLinksModal()" :title="t('shared_links')"
+                        class="h-8 px-2.5 flex items-center justify-center gap-1.5 text-emerald-600 hover:text-emerald-700 bg-white/50 dark:bg-slate-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border border-slate-200 dark:border-slate-700/50 rounded-lg text-sm font-semibold transition-all active:scale-90 shadow-sm">
+                        <i class="fa-solid fa-link"></i>
+                        <span class="hidden sm:inline" x-text="t('shared_links')"></span>
+                    </button>
                     <button @click="createNewFolder"
                         class="hidden md:flex px-3 py-1.5 bg-white/50 dark:bg-slate-800 text-slate-700 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold items-center gap-2 transition-colors">
                         <i class="fa-solid fa-folder-plus"></i><span class="hidden lg:inline"
@@ -794,7 +1086,7 @@
                             x-text="t('remote_upload')"></span>
                     </button>
                     <button @click="uploadModal = true"
-                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm shadow-md shadow-blue-500/25 font-semibold flex items-center gap-2 transition-all">
+                        class="hidden md:flex px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm shadow-md shadow-blue-500/25 font-semibold flex items-center gap-2 transition-all">
                         <i class="fa-solid fa-cloud-arrow-up"></i><span class="hidden md:inline"
                             x-text="t('upload')"></span>
                     </button>
@@ -834,7 +1126,7 @@
                 <!-- Unified Table Header -->
                 <div x-show="files.length > 0 && !isLoading && viewMode === 'list'"
                     class="grid grid-cols-12 gap-4 px-4 md:px-10 py-3 text-[10px] md:text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-t border-slate-200/50 dark:border-white/5">
-                    <div class="col-span-8 md:col-span-5 flex items-center gap-3 cursor-pointer select-none group"
+                    <div class="col-span-10 md:col-span-5 flex items-center gap-3 cursor-pointer select-none group"
                         @click="toggleSort('name')">
                         <input type="checkbox" class="w-4 h-4 accent-blue-600 cursor-pointer rounded" @click.stop
                             @change="
@@ -860,7 +1152,7 @@
                         <i class="fa-solid"
                             :class="sortBy === 'size' ? (sortOrder === 'asc' ? 'fa-sort-up text-blue-500' : 'fa-sort-down text-blue-500') : 'fa-sort opacity-0 group-hover:opacity-40 transition-opacity'"></i>
                     </div>
-                    <div class="col-span-4 md:col-span-2 text-right md:text-center" x-text="t('actions')"></div>
+                    <div class="col-span-2 md:col-span-2 text-right md:text-center" x-text="t('actions')"></div>
                 </div>
             </div>
 
@@ -2591,7 +2883,7 @@
                                                 x-transition.opacity.duration.300ms>
 
                                                 <div
-                                                    class="col-span-8 md:col-span-5 flex items-center gap-3 w-full truncate">
+                                                    class="col-span-10 md:col-span-5 flex items-center gap-3 w-full truncate">
                                                     <input type="checkbox" :value="file.id" x-model.number="selectedIds"
                                                         class="w-4 h-4 accent-blue-600 cursor-pointer rounded">
 
@@ -2647,7 +2939,7 @@
                                                     x-text="file.is_folder ? t('folder') : formatBytes(file.size)">
                                                 </div>
 
-                                                <div class="col-span-4 md:col-span-2 flex justify-end md:justify-center relative"
+                                                <div class="col-span-2 md:col-span-2 flex justify-end md:justify-center relative"
                                                     @click.outside="if (openMenuId === file.id) openMenuId = null">
                                                     <button
                                                         @click.stop="openMenuId = openMenuId === file.id ? null : file.id; let rect = $event.currentTarget.getBoundingClientRect(); menuOpensUp = (window.innerHeight - rect.bottom) < 280;"
@@ -2670,7 +2962,7 @@
                                                                     <button
                                                                         @click="copyShareLink(file, 'direct'); openMenuId = null"
                                                                         class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium transition-colors text-xs">
-                                                                        <i class="fa-solid fa-copy fa-fw"></i> <span
+                                                                        <i class="fa-solid fa-download fa-fw"></i> <span
                                                                             x-text="t('copy_direct_link')"></span>
                                                                     </button>
                                                                 </template>
@@ -2746,7 +3038,7 @@
                                                                     <button
                                                                         @click="copyShareLink(file, 'direct'); openMenuId = null"
                                                                         class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium transition-colors text-xs">
-                                                                        <i class="fa-solid fa-copy fa-fw"></i> <span
+                                                                        <i class="fa-solid fa-download fa-fw"></i> <span
                                                                             x-text="t('copy_direct_link')"></span>
                                                                     </button>
                                                                 </template>
