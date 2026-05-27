@@ -123,7 +123,6 @@ async function main() {
   // JS files
   const jsBuilds = [
     { in: 'static/js/common.js',  out: 'static/js/common.min.js',  bundle: true },
-    { in: 'static/js/script.js',  out: 'static/js/script.min.js',  bundle: true },
   ];
 
   // CSS files
@@ -171,6 +170,27 @@ async function main() {
         logLevel: 'silent',
       }))
     ),
+    // Script splitting build step
+    wrap('static/js/script.min.js', () => esbuild.build({
+      entryPoints: ['static/js/script.js'],
+      outdir: 'static/js',
+      entryNames: '[name].min',
+      chunkNames: 'chunk-[hash].min',
+      minify: true,
+      bundle: true,
+      splitting: true,
+      format: 'esm',
+      external: ['/static/*'],
+      loader: {
+        '.woff': 'file',
+        '.woff2': 'file',
+        '.ttf': 'file',
+        '.eot': 'file',
+        '.svg': 'file',
+      },
+      assetNames: '../webfonts/[name]',
+      logLevel: 'silent',
+    })),
   ];
 
   await Promise.all(tasks);

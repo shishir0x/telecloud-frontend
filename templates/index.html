@@ -9,19 +9,20 @@
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
 
+    <link rel="preload" href="/static/css/tailwind.css?v={{ .version }}" as="style">
+    <link rel="preload" href="/static/css/style.min.css?v={{ .version }}" as="style">
+    <link rel="preload" href="/static/js/common.min.js?v={{ .version }}" as="script">
+    <link rel="modulepreload" href="/static/js/script.min.js?v={{ .version }}">
+
     <link rel="stylesheet" href="/static/css/tailwind.css?v={{ .version }}">
 
     <link rel="stylesheet" href="/static/css/style.min.css?v={{ .version }}">
     <script>window.TELECLOUD_VERSION = '{{ .version }}';</script>
     <script src="/static/js/common.min.js?v={{ .version }}"></script>
     <script>TeleCloud.version = '{{ .version }}';</script>
-    <script src="/static/js/script.min.js?v={{ .version }}"></script>
+    <script type="module" src="/static/js/script.min.js?v={{ .version }}"></script>
 
-    <!-- PDF.js Local Support -->
-    <script src="/static/js/pdf.min.js?v={{ .version }}"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/js/pdf.worker.min.js?v={{ .version }}';
-    </script>
+
     <style>
         .pdf-canvas-invert {
             filter: invert(1) hue-rotate(180deg) !important;
@@ -77,7 +78,7 @@
 <body
     class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 h-full relative overflow-hidden flex flex-col transition-colors duration-500 preloader-active"
     :data-theme="currentTheme"
-    x-data="cloudApp(true, {{ if .is_admin }}true{{ else }}false{{ end }}, {{ .storage_used }}, {{ if .webdav_enabled }}true{{ else }}false{{ end }}, '{{ .webdav_user }}', '{{ .webdav_password }}', {{ if .upload_api_enabled }}true{{ else }}false{{ end }}, '{{ .upload_api_key }}', {{ if .global_webdav_enabled }}true{{ else }}false{{ end }}, {{ if .global_api_enabled }}true{{ else }}false{{ end }}, '{{ .webauthn_rpid }}', '{{ .webauthn_rporigin }}', '{{ .theme }}', {{ if .s3_enabled }}true{{ else }}false{{ end }}, '{{ .s3_access_key }}', '{{ .s3_secret_key }}', {{ if .global_s3_enabled }}true{{ else }}false{{ end }}, {{ if .force_change }}true{{ else }}false{{ end }}, '{{ .log_group_id }}', '{{ .bot_tokens }}', '{{ .bot_statuses }}')"
+    x-data="cloudApp(true, {{ if .is_admin }}true{{ else }}false{{ end }}, {{ .storage_used }}, {{ if .webdav_enabled }}true{{ else }}false{{ end }}, '{{ .webdav_user }}', '{{ .webdav_password }}', {{ if .upload_api_enabled }}true{{ else }}false{{ end }}, '{{ .upload_api_key }}', {{ if .global_webdav_enabled }}true{{ else }}false{{ end }}, {{ if .global_api_enabled }}true{{ else }}false{{ end }}, '{{ .webauthn_rpid }}', '{{ .webauthn_rporigin }}', '{{ .theme }}', {{ if .s3_enabled }}true{{ else }}false{{ end }}, '{{ .s3_access_key }}', '{{ .s3_secret_key }}', {{ if .global_s3_enabled }}true{{ else }}false{{ end }}, {{ if .force_change }}true{{ else }}false{{ end }}, '{{ .log_group_id }}', '{{ .bot_tokens }}', '{{ .bot_statuses }}', '{{ .telegram_user_id }}', '{{ .bot_pool_upload_folder }}')"
     @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false" @drop.prevent="handleDrop($event)">
 
     <!-- App Preloader Overlay -->
@@ -889,12 +890,12 @@
             x-if="imageViewer.show && (imageViewer.isSlideshow ? imageViewer.slideshowFiles.length > 1 : imageFiles.length > 1)">
             <div>
                 <button @click.stop="prevImage()"
-                    class="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-4 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-300 backdrop-blur-sm shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
+                    class="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-4 rounded-full bg-white-pure-10 hover:bg-white-pure-20 text-white transition-all duration-300 backdrop-blur-sm shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
                     :class="!lightboxControlsVisible ? 'opacity-0 pointer-events-none' : 'opacity-100'">
                     <i class="fa-solid fa-chevron-left text-2xl"></i>
                 </button>
                 <button @click.stop="nextImage()"
-                    class="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-4 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-300 backdrop-blur-sm shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
+                    class="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-4 rounded-full bg-white-pure-10 hover:bg-white-pure-20 text-white transition-all duration-300 backdrop-blur-sm shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
                     :class="!lightboxControlsVisible ? 'opacity-0 pointer-events-none' : 'opacity-100'">
                     <i class="fa-solid fa-chevron-right text-2xl"></i>
                 </button>
@@ -903,7 +904,7 @@
 
         <!-- Close button -->
         <button @click="imageViewer.show = false"
-            class="absolute top-4 right-4 z-10 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-300 backdrop-blur-sm shadow-lg cursor-pointer"
+            class="absolute top-4 right-4 z-10 p-3 rounded-full bg-white-pure-10 hover:bg-white-pure-20 text-white transition-all duration-300 backdrop-blur-sm shadow-lg cursor-pointer"
             :class="!lightboxControlsVisible ? 'opacity-0 pointer-events-none' : 'opacity-100'">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
@@ -916,7 +917,7 @@
 
         <!-- Download button -->
         <a :href="imageViewer.src" download :title="t('download')"
-            class="absolute bottom-4 right-4 z-10 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-300 backdrop-blur-sm shadow-lg cursor-pointer"
+            class="absolute bottom-4 right-4 z-10 p-3 rounded-full bg-white-pure-10 hover:bg-white-pure-20 text-white transition-all duration-300 backdrop-blur-sm shadow-lg cursor-pointer"
             :class="!lightboxControlsVisible ? 'opacity-0 pointer-events-none' : 'opacity-100'">
             <i class="fa-solid fa-download text-lg"></i>
         </a>
@@ -926,7 +927,7 @@
             <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center flex-nowrap whitespace-nowrap gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg text-white transition-all duration-300"
                 @click.stop :class="!lightboxControlsVisible ? 'opacity-0 pointer-events-none' : 'opacity-100'">
                 <button @click.stop="toggleSlideshow()"
-                    class="p-2 hover:bg-white/10 rounded-full transition-colors flex-shrink-0"
+                    class="p-2 hover:bg-white-pure-10 rounded-full transition-colors flex-shrink-0"
                     :title="imageViewer.slideshowInterval ? t('pause') : t('play')">
                     <i class="fa-solid text-sm" :class="imageViewer.slideshowInterval ? 'fa-pause' : 'fa-play'"></i>
                 </button>
@@ -939,7 +940,7 @@
                     const i = speeds.indexOf(imageViewer.slideshowSpeed);
                     imageViewer.slideshowSpeed = speeds[(i + 1) % speeds.length];
                     if (imageViewer.slideshowInterval) startSlideshow();
-                " class="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-xs font-mono text-white/90 flex-shrink-0"
+                " class="flex items-center gap-1 px-2 py-1 rounded-lg bg-white-pure-10 hover:bg-white-pure-20 transition-colors text-xs font-mono text-white/90 flex-shrink-0"
                     :title="t('slideshow_speed')">
                     <i class="fa-solid fa-gauge-simple-high text-[10px] text-white/60"></i>
                     <span
@@ -1283,7 +1284,7 @@
                                     </button>
 
                                     <button type="button" @click="saveBotPool()" :disabled="botLoading"
-                                        class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-50">
+                                        class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-50 mt-4">
                                         <i class="fa-solid fa-spinner fa-spin" x-show="botLoading"></i>
                                         <i class="fa-solid fa-floppy-disk" x-show="!botLoading"></i>
                                         <span
@@ -1291,6 +1292,76 @@
                                             Changes</span>
                                     </button>
                                 </div>
+                            </div>
+
+                            <!-- Telegram Bot File Receipt Card -->
+                            <div class="glass-panel p-6 rounded-3xl border border-white/10 h-max relative overflow-hidden bg-gradient-to-br from-blue-500/5 via-transparent to-transparent group hover:border-blue-500/20 transition-all duration-300" x-show="botTokens.length > 0" x-cloak>
+                                <!-- Decorative Top Glow -->
+                                <div class="absolute -top-12 -right-12 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all duration-300"></div>
+
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-sm font-bold flex items-center gap-2.5">
+                                        <div class="w-8 h-8 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center text-blue-500 shadow-inner">
+                                            <i class="fa-solid fa-robot text-xs"></i>
+                                        </div>
+                                        <span x-text="t('bot_user_settings_title')" class="bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">Telegram Bot File Receipt</span>
+                                    </h3>
+                                    <!-- Interactive Active Badge -->
+                                    <template x-if="botUserSettingsForm.telegramUserId && !isNaN(botUserSettingsForm.telegramUserId)">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm animate-pulse-subtle">
+                                            <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+                                            Active
+                                        </span>
+                                    </template>
+                                </div>
+
+                                <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-5" x-text="t('bot_user_settings_desc')">
+                                    Configure your personal Telegram account. When you send a file to any sub-bot in the system, it will automatically appear in your own storage workspace.
+                                </p>
+
+                                <form @submit.prevent="saveBotUserSettings" class="space-y-4">
+                                    <!-- Telegram User ID field -->
+                                    <div>
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block" x-text="t('bot_user_telegram_id_label')">Telegram User ID</label>
+                                        <div class="relative group/input">
+                                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 group-focus-within/input:text-blue-500 transition-colors pointer-events-none">
+                                                <i class="fa-solid fa-user-tag text-xs"></i>
+                                            </span>
+                                            <input type="text" x-model="botUserSettingsForm.telegramUserId" placeholder="e.g. 123456789"
+                                                class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-xs font-mono text-slate-900 dark:text-white transition-all shadow-sm">
+                                        </div>
+                                        <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-1.5" x-text="t('bot_user_telegram_id_help')"></p>
+                                    </div>
+
+                                    <!-- Upload Folder field -->
+                                    <div>
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block" x-text="t('bot_pool_upload_folder_label')">Upload Folder</label>
+                                        <div class="relative group/input">
+                                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 group-focus-within/input:text-blue-500 transition-colors pointer-events-none">
+                                                <i class="fa-solid fa-folder-open text-xs"></i>
+                                            </span>
+                                            <input type="text" x-model="botUserSettingsForm.botPoolUploadFolder" placeholder="TelegramUpload"
+                                                class="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-xs font-mono text-slate-900 dark:text-white transition-all shadow-sm">
+                                        </div>
+                                        <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-1.5" x-text="t('bot_user_upload_folder_help')"></p>
+                                    </div>
+
+                                    <!-- Premium Informative Alert Card -->
+                                    <div class="p-3.5 rounded-2xl bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/10 dark:border-blue-500/20 text-[10px] text-blue-600 dark:text-blue-400 flex gap-2.5 items-start hover:bg-blue-500/10 transition-all duration-200 shadow-sm">
+                                        <i class="fa-solid fa-circle-info mt-0.5 text-xs text-blue-500 animate-pulse"></i>
+                                        <div class="leading-relaxed">
+                                            <span class="font-bold" x-text="t('bot_user_tip_title')">Quick Tip</span>: <span x-html="t('bot_user_tip_desc')"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Submit Button -->
+                                    <button type="submit" :disabled="botUserSettingsLoading"
+                                        class="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-bold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/35 disabled:opacity-50">
+                                        <i class="fa-solid fa-spinner fa-spin" x-show="botUserSettingsLoading"></i>
+                                        <i class="fa-solid fa-circle-check" x-show="!botUserSettingsLoading"></i>
+                                        <span x-text="t('save_changes')">Save Changes</span>
+                                    </button>
+                                </form>
                             </div>
 
 
@@ -2120,6 +2191,7 @@
                                         x-text="t('save_changes')">Save</button>
                                 </form>
                             </div>
+
 
                             <!-- Database & Backup Card -->
                             <div class="glass-panel p-6 rounded-3xl border border-white/10" x-show="isAdmin" x-cloak>
@@ -3571,8 +3643,8 @@
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
         x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-        @keyup.window.right="comicViewer.scrollMode === 'page' && nextComicPage()"
-        @keyup.window.left="comicViewer.scrollMode === 'page' && prevComicPage()"
+        @keyup.window.right="comicViewer.scrollMode === 'page' && (comicViewer.direction === 'rtl' ? prevComicPage() : nextComicPage())"
+        @keyup.window.left="comicViewer.scrollMode === 'page' && (comicViewer.direction === 'rtl' ? nextComicPage() : prevComicPage())"
         @keyup.window.escape="comicViewer.show && closeComicViewer()">
 
         <!-- Ambient Glow behind content -->
@@ -3609,6 +3681,41 @@
 
                 <!-- Desktop-only Inline Controls -->
                 <div class="hidden sm:flex items-center gap-2 sm:gap-4">
+                    <!-- Direction Selector Dropdown -->
+                    <div class="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1"
+                        x-show="comicViewer.scrollMode === 'page'">
+                        <button @click.stop="setComicDirection('ltr')"
+                            class="px-2 py-1 text-[10px] font-bold rounded-lg transition-all"
+                            :class="comicViewer.direction === 'ltr' ? 'bg-violet-500 text-white shadow-sm' : 'text-slate-300 hover:text-white'"
+                            title="Left to Right">
+                            LTR
+                        </button>
+                        <button @click.stop="setComicDirection('rtl')"
+                            class="px-2 py-1 text-[10px] font-bold rounded-lg transition-all"
+                            :class="comicViewer.direction === 'rtl' ? 'bg-violet-500 text-white shadow-sm' : 'text-slate-300 hover:text-white'"
+                            title="Right to Left (Manga)">
+                            RTL
+                        </button>
+                    </div>
+
+                    <!-- View Mode Selector -->
+                    <select @change="setComicViewMode($event.target.value)" :value="comicViewer.viewMode || 'single'"
+                        x-show="comicViewer.scrollMode === 'page'"
+                        class="px-2 py-1.5 text-xs font-bold bg-slate-900 border border-white/10 text-white rounded-xl focus:outline-none cursor-pointer">
+                        <option value="single" x-text="t('comic_view_single') || 'Single'"></option>
+                        <option value="double" x-text="t('comic_view_double') || 'Double'"></option>
+                    </select>
+
+                    <!-- Filter Selector -->
+                    <select @change="setComicFilter($event.target.value)" :value="comicViewer.filter || 'none'"
+                        class="px-2 py-1.5 text-xs font-bold bg-slate-900 border border-white/10 text-white rounded-xl focus:outline-none cursor-pointer">
+                        <option value="none" x-text="t('comic_filter_none') || 'No Filter'"></option>
+                        <option value="eye-care" x-text="t('comic_filter_eyecare') || 'Eye Care'"></option>
+                        <option value="sepia" x-text="t('comic_filter_sepia') || 'Sepia'"></option>
+                        <option value="contrast" x-text="t('comic_filter_contrast') || 'High Contrast'"></option>
+                        <option value="grayscale" x-text="t('comic_filter_grayscale') || 'Grayscale'"></option>
+                    </select>
+
                     <!-- Scroll Mode Toggle -->
                     <button
                         @click.stop="comicViewer.scrollMode = (comicViewer.scrollMode === 'page' ? 'continuous' : 'page')"
@@ -3671,48 +3778,79 @@
 
         <!-- Collapsible Mobile Settings Toolbar -->
         <div x-show="comicViewer.settingsOpen" x-collapse
-            class="sm:hidden flex flex-wrap items-center justify-around gap-3 p-3 border-b border-white/5 bg-slate-900/60 backdrop-blur-md transition-all duration-200">
-            <!-- Scroll Mode Toggle -->
-            <button @click.stop="comicViewer.scrollMode = (comicViewer.scrollMode === 'page' ? 'continuous' : 'page')"
-                class="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/15 border border-white/10 rounded-xl transition-all duration-200"
-                :title="comicViewer.scrollMode === 'page' ? t('scroll_continuous') : t('scroll_page')">
-                <i class="fa-solid" :class="comicViewer.scrollMode === 'page' ? 'fa-scroll' : 'fa-file-lines'"></i>
-            </button>
+            class="sm:hidden flex flex-col gap-3 p-4 border-b border-white/5 bg-slate-900/60 backdrop-blur-md transition-all duration-200">
+            
+            <div class="flex flex-wrap items-center justify-between gap-3" x-show="comicViewer.scrollMode === 'page'">
+                <!-- Direction Selector -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400 font-bold" x-text="t('comic_direction') || 'Direction'"></span>
+                    <div class="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1">
+                        <button @click.stop="setComicDirection('ltr')"
+                            class="px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all"
+                            :class="comicViewer.direction === 'ltr' ? 'bg-violet-500 text-white shadow-sm' : 'text-slate-300'"
+                            title="Left to Right">
+                            LTR
+                        </button>
+                        <button @click.stop="setComicDirection('rtl')"
+                            class="px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all"
+                            :class="comicViewer.direction === 'rtl' ? 'bg-violet-500 text-white shadow-sm' : 'text-slate-300'"
+                            title="Right to Left">
+                            RTL
+                        </button>
+                    </div>
+                </div>
 
-            <!-- Auto scroll play/pause (only in continuous scroll mode) -->
-            <button x-show="comicViewer.scrollMode === 'continuous'" @click.stop="toggleComicAutoScroll()"
-                class="p-2 border rounded-xl transition-all duration-200"
-                :class="comicViewer.autoScrollActive ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/25' : 'text-slate-300 hover:text-white bg-white/5 hover:bg-white/15 border-white/10'"
-                :title="comicViewer.autoScrollActive ? t('comic_auto_scroll_stop') : t('comic_auto_scroll_start')">
-                <i class="fa-solid text-sm" :class="comicViewer.autoScrollActive ? 'fa-pause' : 'fa-play'"></i>
-            </button>
+                <!-- View Mode -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400 font-bold" x-text="t('comic_view_mode') || 'View Mode'"></span>
+                    <select @change="setComicViewMode($event.target.value)" :value="comicViewer.viewMode || 'single'"
+                        class="px-2 py-1 text-xs font-bold bg-slate-950 border border-white/10 text-white rounded-lg focus:outline-none cursor-pointer">
+                        <option value="single" x-text="t('comic_view_single') || 'Single'"></option>
+                        <option value="double" x-text="t('comic_view_double') || 'Double'"></option>
+                    </select>
+                </div>
+            </div>
 
-            <!-- Speed controls (only when auto scroll is active) -->
-            <template x-if="comicViewer.scrollMode === 'continuous' && comicViewer.autoScrollActive">
-                <div
-                    class="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1 transition-all duration-200">
-                    <button @click.stop="changeComicAutoScrollSpeed(-1)"
-                        class="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                        title="Slower">
-                        <i class="fa-solid fa-minus text-[10px]"></i>
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-3">
+                <!-- Filter -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400 font-bold" x-text="t('comic_filter') || 'Filter'"></span>
+                    <select @change="setComicFilter($event.target.value)" :value="comicViewer.filter || 'none'"
+                        class="px-2 py-1 text-xs font-bold bg-slate-950 border border-white/10 text-white rounded-lg focus:outline-none cursor-pointer">
+                        <option value="none" x-text="t('comic_filter_none') || 'No Filter'"></option>
+                        <option value="eye-care" x-text="t('comic_filter_eyecare') || 'Eye Care'"></option>
+                        <option value="sepia" x-text="t('comic_filter_sepia') || 'Sepia'"></option>
+                        <option value="contrast" x-text="t('comic_filter_contrast') || 'High Contrast'"></option>
+                        <option value="grayscale" x-text="t('comic_filter_grayscale') || 'Grayscale'"></option>
+                    </select>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex items-center gap-2">
+                    <!-- Scroll Mode Toggle -->
+                    <button @click.stop="comicViewer.scrollMode = (comicViewer.scrollMode === 'page' ? 'continuous' : 'page')"
+                        class="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/15 border border-white/10 rounded-xl transition-all duration-200"
+                        :title="comicViewer.scrollMode === 'page' ? t('scroll_continuous') : t('scroll_page')">
+                        <i class="fa-solid" :class="comicViewer.scrollMode === 'page' ? 'fa-scroll' : 'fa-file-lines'"></i>
                     </button>
-                    <span class="text-[10px] font-bold font-mono text-slate-300 min-w-[20px] text-center"
-                        x-text="comicViewer.autoScrollSpeed + 'x'"></span>
-                    <button @click.stop="changeComicAutoScrollSpeed(1)"
-                        class="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                        title="Faster">
-                        <i class="fa-solid fa-plus text-[10px]"></i>
+
+                    <!-- Auto scroll play/pause -->
+                    <button x-show="comicViewer.scrollMode === 'continuous'" @click.stop="toggleComicAutoScroll()"
+                        class="p-2 border rounded-xl transition-all duration-200"
+                        :class="comicViewer.autoScrollActive ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/25' : 'text-slate-300 hover:text-white bg-white/5 hover:bg-white/15 border-white/10'"
+                        :title="comicViewer.autoScrollActive ? t('comic_auto_scroll_stop') : t('comic_auto_scroll_start')">
+                        <i class="fa-solid text-sm" :class="comicViewer.autoScrollActive ? 'fa-pause' : 'fa-play'"></i>
+                    </button>
+
+                    <!-- Fit Mode Toggle -->
+                    <button @click.stop="comicViewer.fitMode = (comicViewer.fitMode === 'height' ? 'width' : 'height')"
+                        class="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/15 border border-white/10 rounded-xl transition-all duration-200"
+                        :title="comicViewer.fitMode === 'height' ? t('fit_width') : t('fit_height')">
+                        <i class="fa-solid"
+                            :class="comicViewer.fitMode === 'height' ? 'fa-arrows-left-right' : 'fa-arrows-up-down'"></i>
                     </button>
                 </div>
-            </template>
-
-            <!-- Fit Mode Toggle -->
-            <button @click.stop="comicViewer.fitMode = (comicViewer.fitMode === 'height' ? 'width' : 'height')"
-                class="p-2 text-slate-300 hover:text-white bg-white/5 hover:bg-white/15 border border-white/10 rounded-xl transition-all duration-200"
-                :title="comicViewer.fitMode === 'height' ? t('fit_width') : t('fit_height')">
-                <i class="fa-solid"
-                    :class="comicViewer.fitMode === 'height' ? 'fa-arrows-left-right' : 'fa-arrows-up-down'"></i>
-            </button>
+            </div>
         </div>
 
         <!-- Main Comic Canvas Area -->
@@ -3727,32 +3865,53 @@
 
             <!-- Page-by-Page View -->
             <div x-show="comicViewer.scrollMode === 'page'"
-                class="w-full h-full flex items-center justify-center relative">
-                <!-- Page Image Container -->
-                <div class="flex items-center justify-center min-h-0 min-w-0 max-w-full max-h-full z-0 select-none">
-                    <template x-if="comicViewer.pages.length > 0">
-                        <img id="comic-viewer-img"
-                            class="select-none shadow-2xl rounded-sm transition-opacity duration-300" :class="[
-                                comicViewer.fitMode === 'height' ? 'max-h-[82vh] max-w-full object-contain' : 'w-full max-w-3xl object-contain',
+                class="w-full h-full flex items-center justify-center relative select-none"
+                :class="comicViewer.zoomActive ? 'overflow-auto cursor-grab' : 'overflow-hidden'"
+                @touchstart="handleComicTouchStart($event)"
+                @touchend="handleComicTouchEnd($event)">
+
+                <!-- Navigation buttons (Desktop only, absolute float, only when not zoomed) -->
+                <button x-show="!comicViewer.zoomActive"
+                    class="hidden md:flex absolute left-6 top-1/2 -translate-y-1/2 z-20 items-center justify-center w-12 h-12 rounded-full border border-white/10 bg-slate-950/60 hover:bg-violet-600 hover:border-violet-500 text-white shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95"
+                    @click.stop="comicViewer.direction === 'rtl' ? nextComicPage() : prevComicPage()"
+                    title="Previous Page">
+                    <i class="fa-solid fa-chevron-left text-lg"></i>
+                </button>
+                <button x-show="!comicViewer.zoomActive"
+                    class="hidden md:flex absolute right-6 top-1/2 -translate-y-1/2 z-20 items-center justify-center w-12 h-12 rounded-full border border-white/10 bg-slate-950/60 hover:bg-violet-600 hover:border-violet-500 text-white shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95"
+                    @click.stop="comicViewer.direction === 'rtl' ? prevComicPage() : nextComicPage()"
+                    title="Next Page">
+                    <i class="fa-solid fa-chevron-right text-lg"></i>
+                </button>
+                
+                <!-- Page Images Container -->
+                <div class="flex items-center justify-center gap-2 sm:gap-4 min-h-0 min-w-0 max-w-full max-h-full z-0 transition-transform duration-300"
+                    :class="[
+                        comicViewer.direction === 'rtl' ? 'flex-row-reverse' : 'flex-row',
+                        comicViewer.zoomActive ? 'scale-[2.0] origin-center cursor-grab' : ''
+                    ]">
+                    <template x-for="idx in getComicPagesToRender()" :key="idx">
+                        <img class="select-none shadow-2xl rounded-sm transition-all duration-300 object-contain"
+                            :style="'filter: ' + getComicFilterStyle()"
+                            :class="[
+                                comicViewer.fitMode === 'height' ? (comicViewer.viewMode === 'single' ? 'max-h-[82vh] max-w-full' : 'max-h-[82vh] max-w-[48vw]') : (comicViewer.viewMode === 'single' ? 'w-full max-w-3xl' : 'w-[48vw] max-w-xl'),
                                 comicViewer.pageLoading ? 'opacity-0' : 'opacity-100'
-                            ]" :src="comicViewer.pageUrls[comicViewer.currentPageIndex]" alt="Comic Page"
-                            draggable="false" @load="comicViewer.pageLoading = false"
+                            ]"
+                            :src="comicViewer.pageUrls[idx]"
+                            alt="Comic Page"
+                            draggable="false"
+                            @dblclick="toggleComicZoom($event)"
+                            @load="comicViewer.pageLoading = false"
                             @error="comicViewer.pageLoading = false; if (comicViewer.file) showToast(t('err_loading_comic'), 'error')">
                     </template>
                 </div>
 
-                <!-- Invisible Page zones for pagination (touch friendly, desktop mouse friendly) -->
-                <div class="absolute inset-y-0 left-0 w-1/4 z-10 cursor-west-resize group" @click="prevComicPage()">
-                    <div
-                        class="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                        <i class="fa-solid fa-chevron-left text-2xl text-white/70"></i>
-                    </div>
+                <!-- Invisible Page zones for pagination (touch friendly, desktop mouse friendly - only when not zoomed) -->
+                <div x-show="!comicViewer.zoomActive" class="absolute inset-y-0 left-0 w-1/4 z-10 cursor-west-resize" 
+                    @click="comicViewer.direction === 'rtl' ? nextComicPage() : prevComicPage()">
                 </div>
-                <div class="absolute inset-y-0 right-0 w-1/4 z-10 cursor-east-resize group" @click="nextComicPage()">
-                    <div
-                        class="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                        <i class="fa-solid fa-chevron-right text-2xl text-white/70"></i>
-                    </div>
+                <div x-show="!comicViewer.zoomActive" class="absolute inset-y-0 right-0 w-1/4 z-10 cursor-east-resize" 
+                    @click="comicViewer.direction === 'rtl' ? prevComicPage() : nextComicPage()">
                 </div>
             </div>
 
@@ -3764,6 +3923,7 @@
                         :class="comicViewer.fitMode === 'height' ? 'max-h-[90vh]' : 'w-full max-w-3xl mx-auto'">
                         <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 3 4'%3E%3C/svg%3E"
                             :data-src="pageUrl" x-init="registerComicLazyImage($el)"
+                            :style="'filter: ' + getComicFilterStyle()"
                             class="object-contain max-w-full opacity-0 transition-opacity duration-500"
                             :class="comicViewer.fitMode === 'height' ? 'max-h-[90vh]' : 'w-full max-w-3xl'"
                             alt="Comic Page" draggable="false"
@@ -3777,26 +3937,48 @@
 
     <!-- ==================== EPUB READER MODAL ==================== -->
     <div x-show="epubViewer.show" x-cloak
-        class="fixed inset-0 z-[600] flex flex-col bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 select-none"
-        x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
-        x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200"
-        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-        @keyup.window.right="nextEpubPage()" @keyup.window.left="prevEpubPage()"
+        :style="getEpubThemeStyles()"
+        class="fixed inset-0 z-[600] flex flex-col select-none transition-colors duration-300"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 scale-95"
+        x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-95"
+        @keyup.window.right="nextEpubPage()"
+        @keyup.window.left="prevEpubPage()"
+        @keydown.window.down="if (epubViewer.show) { $event.preventDefault(); const iframe = document.querySelector('#epub-viewer-area iframe'); if (iframe && iframe.contentWindow) { iframe.contentWindow.scrollBy({ top: 100, behavior: 'smooth' }); } }"
+        @keydown.window.up="if (epubViewer.show) { $event.preventDefault(); const iframe = document.querySelector('#epub-viewer-area iframe'); if (iframe && iframe.contentWindow) { iframe.contentWindow.scrollBy({ top: -100, behavior: 'smooth' }); } }"
         @keyup.window.escape="epubViewer.show && closeEpubViewer()">
 
+        <style>
+            .epub-btn:hover {
+                background-color: var(--epub-hover-bg) !important;
+            }
+            .epub-toc-btn {
+                color: var(--epub-fg) !important;
+                opacity: 0.85;
+            }
+            .epub-toc-btn:hover {
+                background-color: var(--epub-hover-bg) !important;
+                opacity: 1;
+                border-color: var(--epub-border) !important;
+            }
+        </style>
+
         <!-- Top Header Panel -->
-        <header
-            class="relative z-30 flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700/50 shadow-sm gap-4">
+        <header :style="'background-color: var(--epub-header-bg); border-color: var(--epub-border); color: var(--epub-fg);'"
+            class="relative z-30 flex items-center justify-between p-4 backdrop-blur-md border-b shadow-sm gap-4">
             <div class="flex items-center gap-3 min-w-0">
                 <button @click="epubViewer.sidebarOpen = !epubViewer.sidebarOpen"
-                    class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
+                    class="p-2 rounded-xl transition-all duration-200 epub-btn"
+                    :style="'color: var(--epub-fg);'"
                     title="Table of Contents">
                     <i class="fa-solid fa-list-ol text-lg"></i>
                 </button>
                 <div class="min-w-0">
-                    <h3 class="text-slate-950 dark:text-white text-sm sm:text-base font-bold truncate"
-                        x-text="epubViewer.file?.filename"></h3>
-                    <p class="text-slate-500 dark:text-slate-400 text-xs mt-0.5" x-text="t('epub_reader')"></p>
+                    <h3 class="text-sm sm:text-base font-bold truncate" :style="'color: var(--epub-fg);'" x-text="epubViewer.file?.filename"></h3>
+                    <p class="text-xs mt-0.5 opacity-70" :style="'color: var(--epub-fg);'" x-text="t('epub_reader')"></p>
                 </div>
             </div>
 
@@ -3806,60 +3988,120 @@
                 <div class="hidden sm:flex items-center gap-2 sm:gap-3">
                     <!-- Auto scroll play/pause -->
                     <button @click="toggleEpubAutoScroll()"
-                        class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
-                        :class="epubViewer.autoScrollActive ? 'text-emerald-600 dark:text-emerald-400 bg-slate-100 dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400'"
+                        class="p-2 rounded-xl transition-all duration-200 epub-btn"
+                        :class="epubViewer.autoScrollActive ? 'bg-black/5 dark:bg-white/10' : ''"
+                        :style="'color: var(--epub-fg);'"
                         :title="epubViewer.autoScrollActive ? t('epub_auto_scroll_stop') : t('epub_auto_scroll_start')">
                         <i class="fa-solid text-sm" :class="epubViewer.autoScrollActive ? 'fa-pause' : 'fa-play'"></i>
                     </button>
 
                     <!-- Speed controls (only when auto scroll is active) -->
                     <template x-if="epubViewer.autoScrollActive">
-                        <div
-                            class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-xl p-1 transition-all duration-200">
+                        <div class="flex items-center gap-1 rounded-xl p-1 transition-all duration-200"
+                            :style="'background-color: var(--epub-hover-bg);'">
                             <button @click="changeEpubAutoScrollSpeed(-1)"
-                                class="p-1 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-all duration-200"
+                                class="p-1 rounded-lg transition-all duration-200 hover:bg-black/10 dark:hover:bg-white/10"
+                                :style="'color: var(--epub-fg);'"
                                 title="Slower">
                                 <i class="fa-solid fa-minus text-[10px]"></i>
                             </button>
-                            <span
-                                class="text-[10px] font-bold font-mono text-slate-600 dark:text-slate-300 min-w-[20px] text-center"
-                                x-text="epubViewer.autoScrollSpeed + 'x'"></span>
+                            <span class="text-[10px] font-bold font-mono min-w-[20px] text-center" :style="'color: var(--epub-fg);'" x-text="epubViewer.autoScrollSpeed + 'x'"></span>
                             <button @click="changeEpubAutoScrollSpeed(1)"
-                                class="p-1 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-all duration-200"
+                                class="p-1 rounded-lg transition-all duration-200 hover:bg-black/10 dark:hover:bg-white/10"
+                                :style="'color: var(--epub-fg);'"
                                 title="Faster">
                                 <i class="fa-solid fa-plus text-[10px]"></i>
                             </button>
                         </div>
                     </template>
 
+                    <!-- Font Family Selector -->
+                    <select @change="setEpubFontFamily($event.target.value)" :value="epubViewer.fontFamily || 'sans-serif'"
+                        class="px-2 py-1 text-xs font-bold rounded-lg border focus:outline-none transition-all cursor-pointer mr-1"
+                        :style="'background-color: var(--epub-bg); border-color: var(--epub-border); color: var(--epub-fg);'">
+                        <option value="sans-serif">Modern</option>
+                        <option value="serif">Classic</option>
+                        <option value="monospace">Mono</option>
+                        <option value="dyslexic">Dyslexic</option>
+                    </select>
+
                     <!-- Font size decrease -->
                     <button @click="changeEpubFontSize(-10)"
-                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200">
+                        class="p-2 rounded-xl transition-all duration-200 epub-btn"
+                        :style="'color: var(--epub-fg);'">
                         <i class="fa-solid fa-minus text-xs"></i><span class="ml-1 text-xs font-bold">A</span>
                     </button>
 
                     <!-- Current Font Percentage -->
-                    <span class="text-xs font-semibold font-mono text-slate-500 dark:text-slate-400"
-                        x-text="epubViewer.fontSize + '%'"></span>
+                    <span class="text-xs font-semibold font-mono" :style="'color: var(--epub-fg);'" x-text="epubViewer.fontSize + '%'"></span>
 
                     <!-- Font size increase -->
                     <button @click="changeEpubFontSize(10)"
-                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200">
+                        class="p-2 rounded-xl transition-all duration-200 epub-btn"
+                        :style="'color: var(--epub-fg);'">
                         <i class="fa-solid fa-plus text-xs"></i><span class="ml-1 text-xs font-bold">A</span>
                     </button>
+
+                    <!-- Theme Selector Swatches -->
+                    <div class="flex items-center gap-1.5 border-l pl-3" :style="'border-color: var(--epub-border);'">
+                        <!-- System -->
+                        <button @click="setEpubTheme('system')"
+                            class="w-5.5 h-5.5 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95"
+                            :class="epubViewer.theme === 'system' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                            :style="'background: linear-gradient(135deg, #ffffff 50%, #1e293b 50%); border-color: var(--epub-border);'"
+                            title="System Theme">
+                        </button>
+                        <!-- Light -->
+                        <button @click="setEpubTheme('light')"
+                            class="w-5.5 h-5.5 rounded-full border transition-all duration-200 hover:scale-110 active:scale-95 bg-white"
+                            :class="epubViewer.theme === 'light' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                            :style="'border-color: var(--epub-border);'"
+                            title="Light Theme">
+                        </button>
+                        <!-- Cream -->
+                        <button @click="setEpubTheme('cream')"
+                            class="w-5.5 h-5.5 rounded-full border transition-all duration-200 hover:scale-110 active:scale-95"
+                            :class="epubViewer.theme === 'cream' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                            style="background-color: #faf6ee; border-color: #e4d5c3;"
+                            title="Cream Theme">
+                        </button>
+                        <!-- Sepia -->
+                        <button @click="setEpubTheme('sepia')"
+                            class="w-5.5 h-5.5 rounded-full border transition-all duration-200 hover:scale-110 active:scale-95"
+                            :class="epubViewer.theme === 'sepia' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                            style="background-color: #f4ecd8; border-color: #decfa6;"
+                            title="Sepia Theme">
+                        </button>
+                        <!-- Olive -->
+                        <button @click="setEpubTheme('olive')"
+                            class="w-5.5 h-5.5 rounded-full border transition-all duration-200 hover:scale-110 active:scale-95"
+                            :class="epubViewer.theme === 'olive' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                            style="background-color: #e8f5e9; border-color: #c3e6cb;"
+                            title="Olive Theme">
+                        </button>
+                        <!-- Dark -->
+                        <button @click="setEpubTheme('dark')"
+                            class="w-5.5 h-5.5 rounded-full border transition-all duration-200 hover:scale-110 active:scale-95"
+                            :class="epubViewer.theme === 'dark' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                            style="background-color: #0f172a; border-color: #334155;"
+                            title="Dark Theme">
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Mobile Settings Toggle -->
                 <button @click="epubViewer.settingsOpen = !epubViewer.settingsOpen"
-                    class="sm:hidden p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
-                    :class="epubViewer.settingsOpen ? 'text-blue-600 bg-slate-100 dark:bg-slate-700' : ''"
+                    class="sm:hidden p-2 rounded-xl transition-all duration-200 epub-btn"
+                    :class="epubViewer.settingsOpen ? 'bg-black/5 dark:bg-white/10' : ''"
+                    :style="'color: var(--epub-fg);'"
                     title="Settings">
                     <i class="fa-solid fa-sliders text-sm"></i>
                 </button>
 
                 <!-- Close Button -->
                 <button @click.stop="closeEpubViewer()"
-                    class="p-2 text-slate-500 dark:text-slate-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-500 rounded-xl transition-all duration-200">
+                    class="p-2 rounded-xl transition-all duration-200 hover:bg-red-500 hover:text-white"
+                    :style="'color: var(--epub-fg);'">
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
@@ -3867,68 +4109,127 @@
 
         <!-- Collapsible Mobile Settings Toolbar -->
         <div x-show="epubViewer.settingsOpen" x-collapse
-            class="sm:hidden flex flex-wrap items-center justify-between gap-3 p-3 border-b border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800 transition-all duration-200">
-            <!-- Font adjustments -->
-            <div class="flex items-center gap-2">
-                <button @click="changeEpubFontSize(-10)"
-                    class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200">
-                    <i class="fa-solid fa-minus text-xs"></i><span class="ml-1 text-xs font-bold">A</span>
-                </button>
-                <span class="text-xs font-semibold font-mono text-slate-500 dark:text-slate-400"
-                    x-text="epubViewer.fontSize + '%'"></span>
-                <button @click="changeEpubFontSize(10)"
-                    class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200">
-                    <i class="fa-solid fa-plus text-xs"></i><span class="ml-1 text-xs font-bold">A</span>
-                </button>
-            </div>
+             :style="'background-color: var(--epub-header-bg); border-color: var(--epub-border); color: var(--epub-fg);'"
+             class="sm:hidden flex flex-col gap-3 p-4 border-b transition-all duration-200">
+             <!-- First Row: Font Family and Size -->
+             <div class="flex items-center justify-between gap-3">
+                 <!-- Font Family -->
+                 <select @change="setEpubFontFamily($event.target.value)" :value="epubViewer.fontFamily || 'sans-serif'"
+                     class="px-2 py-1 text-xs font-bold rounded-lg border focus:outline-none transition-all cursor-pointer"
+                     :style="'background-color: var(--epub-bg); border-color: var(--epub-border); color: var(--epub-fg);'">
+                     <option value="sans-serif">Modern</option>
+                     <option value="serif">Classic</option>
+                     <option value="monospace">Mono</option>
+                     <option value="dyslexic">Dyslexic</option>
+                 </select>
+                 
+                 <!-- Font adjustments -->
+                 <div class="flex items-center gap-2">
+                     <button @click="changeEpubFontSize(-10)"
+                         class="p-2 rounded-xl transition-all duration-200 epub-btn"
+                         :style="'color: var(--epub-fg);'">
+                         <i class="fa-solid fa-minus text-xs"></i><span class="ml-1 text-xs font-bold">A</span>
+                     </button>
+                     <span class="text-xs font-semibold font-mono" :style="'color: var(--epub-fg);'" x-text="epubViewer.fontSize + '%'"></span>
+                     <button @click="changeEpubFontSize(10)"
+                         class="p-2 rounded-xl transition-all duration-200 epub-btn"
+                         :style="'color: var(--epub-fg);'">
+                         <i class="fa-solid fa-plus text-xs"></i><span class="ml-1 text-xs font-bold">A</span>
+                     </button>
+                 </div>
+             </div>
 
-            <!-- Auto scroll and speed controls -->
-            <div class="flex items-center gap-2">
-                <button @click="toggleEpubAutoScroll()"
-                    class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
-                    :class="epubViewer.autoScrollActive ? 'text-emerald-600 dark:text-emerald-400 bg-slate-100 dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400'"
-                    :title="epubViewer.autoScrollActive ? t('epub_auto_scroll_stop') : t('epub_auto_scroll_start')">
-                    <i class="fa-solid text-sm" :class="epubViewer.autoScrollActive ? 'fa-pause' : 'fa-play'"></i>
-                </button>
+             <!-- Second Row: Themes & Auto Scroll -->
+             <div class="flex items-center justify-between gap-3 border-t pt-3" :style="'border-color: var(--epub-border);'">
+                 <!-- Theme Selector Swatches -->
+                 <div class="flex items-center gap-1.5 flex-wrap">
+                     <button @click="setEpubTheme('system')"
+                         class="w-5.5 h-5.5 rounded-full border flex items-center justify-center transition-all duration-200"
+                         :class="epubViewer.theme === 'system' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                         :style="'background: linear-gradient(135deg, #ffffff 50%, #1e293b 50%); border-color: var(--epub-border);'"
+                         title="System">
+                     </button>
+                     <button @click="setEpubTheme('light')"
+                         class="w-5.5 h-5.5 rounded-full border transition-all duration-200 bg-white"
+                         :class="epubViewer.theme === 'light' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                         :style="'border-color: var(--epub-border);'"
+                         title="Light">
+                     </button>
+                     <button @click="setEpubTheme('cream')"
+                         class="w-5.5 h-5.5 rounded-full border transition-all duration-200"
+                         :class="epubViewer.theme === 'cream' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                         style="background-color: #faf6ee; border-color: #e4d5c3;"
+                         title="Cream">
+                     </button>
+                     <button @click="setEpubTheme('sepia')"
+                         class="w-5.5 h-5.5 rounded-full border transition-all duration-200"
+                         :class="epubViewer.theme === 'sepia' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                         style="background-color: #f4ecd8; border-color: #decfa6;"
+                         title="Sepia">
+                     </button>
+                     <button @click="setEpubTheme('olive')"
+                         class="w-5.5 h-5.5 rounded-full border transition-all duration-200"
+                         :class="epubViewer.theme === 'olive' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                         style="background-color: #e8f5e9; border-color: #c3e6cb;"
+                         title="Olive">
+                     </button>
+                     <button @click="setEpubTheme('dark')"
+                         class="w-5.5 h-5.5 rounded-full border transition-all duration-200"
+                         :class="epubViewer.theme === 'dark' ? 'ring-2 ring-blue-500 scale-105' : ''"
+                         style="background-color: #0f172a; border-color: #334155;"
+                         title="Dark">
+                     </button>
+                 </div>
 
-                <template x-if="epubViewer.autoScrollActive">
-                    <div
-                        class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-xl p-1 transition-all duration-200">
-                        <button @click="changeEpubAutoScrollSpeed(-1)"
-                            class="p-1 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-all duration-200"
-                            title="Slower">
-                            <i class="fa-solid fa-minus text-[10px]"></i>
-                        </button>
-                        <span
-                            class="text-[10px] font-bold font-mono text-slate-600 dark:text-slate-300 min-w-[20px] text-center"
-                            x-text="epubViewer.autoScrollSpeed + 'x'"></span>
-                        <button @click="changeEpubAutoScrollSpeed(1)"
-                            class="p-1 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-all duration-200"
-                            title="Faster">
-                            <i class="fa-solid fa-plus text-[10px]"></i>
-                        </button>
-                    </div>
-                </template>
-            </div>
+                 <!-- Auto scroll and speed controls -->
+                 <div class="flex items-center gap-2">
+                     <button @click="toggleEpubAutoScroll()"
+                         class="p-2 rounded-xl transition-all duration-200 epub-btn"
+                         :class="epubViewer.autoScrollActive ? 'bg-black/5 dark:bg-white/10' : ''"
+                         :style="'color: var(--epub-fg);'"
+                         :title="epubViewer.autoScrollActive ? t('epub_auto_scroll_stop') : t('epub_auto_scroll_start')">
+                         <i class="fa-solid text-sm" :class="epubViewer.autoScrollActive ? 'fa-pause' : 'fa-play'"></i>
+                     </button>
+
+                     <template x-if="epubViewer.autoScrollActive">
+                         <div class="flex items-center gap-1 rounded-xl p-1 transition-all duration-200"
+                             :style="'background-color: var(--epub-hover-bg);'">
+                             <button @click="changeEpubAutoScrollSpeed(-1)"
+                                 class="p-1 rounded-lg transition-all duration-200 hover:bg-black/10 dark:hover:bg-white/10"
+                                 :style="'color: var(--epub-fg);'"
+                                 title="Slower">
+                                 <i class="fa-solid fa-minus text-[10px]"></i>
+                             </button>
+                             <span class="text-[10px] font-bold font-mono min-w-[20px] text-center" :style="'color: var(--epub-fg);'" x-text="epubViewer.autoScrollSpeed + 'x'"></span>
+                             <button @click="changeEpubAutoScrollSpeed(1)"
+                                 class="p-1 rounded-lg transition-all duration-200 hover:bg-black/10 dark:hover:bg-white/10"
+                                 :style="'color: var(--epub-fg);'"
+                                 title="Faster">
+                                 <i class="fa-solid fa-plus text-[10px]"></i>
+                             </button>
+                         </div>
+                     </template>
+                 </div>
+             </div>
         </div>
 
         <!-- Main Container: Sidebar + Ebook Area -->
         <div class="flex-1 flex min-h-0 relative">
-
+            
             <!-- Table of Contents Slide-over Sidebar -->
             <div x-show="epubViewer.sidebarOpen" x-cloak
-                class="absolute inset-y-0 left-0 w-80 max-w-full bg-slate-50 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700/50 shadow-2xl z-40 flex flex-col"
-                x-transition:enter="transition ease-out duration-300" x-transition:enter-start="-translate-x-full"
-                x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in duration-200"
-                x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full">
-
-                <div
-                    class="p-4 border-b border-slate-200 dark:border-slate-700/50 flex justify-between items-center bg-slate-100/50 dark:bg-slate-800/50">
-                    <span
-                        class="font-bold text-slate-900 dark:text-white text-sm uppercase tracking-wider text-ellipsis overflow-hidden"
-                        x-text="t('epub_toc') || 'Mục lục'">Mục lục</span>
-                    <button @click="epubViewer.sidebarOpen = false"
-                        class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                :style="'background-color: var(--epub-sidebar-bg); border-color: var(--epub-border); color: var(--epub-fg);'"
+                class="absolute inset-y-0 left-0 w-80 max-w-full border-r shadow-2xl z-40 flex flex-col"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="-translate-x-full"
+                x-transition:enter-end="translate-x-0"
+                x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="translate-x-0"
+                x-transition:leave-end="-translate-x-full">
+                
+                <div class="p-4 border-b flex justify-between items-center bg-black/5 dark:bg-white/5" :style="'border-color: var(--epub-border);'">
+                    <span class="font-bold text-sm uppercase tracking-wider text-ellipsis overflow-hidden" :style="'color: var(--epub-fg);'" x-text="t('epub_toc') || 'Mục lục'">Mục lục</span>
+                    <button @click="epubViewer.sidebarOpen = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                         <i class="fa-solid fa-xmark text-lg"></i>
                     </button>
                 </div>
@@ -3936,9 +4237,9 @@
                 <div class="flex-1 overflow-y-auto p-2 space-y-1">
                     <template x-for="item in epubViewer.toc" :key="item.id">
                         <button @click="navigateToCfi(item.href)"
-                            class="w-full text-left py-2 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-xs sm:text-sm transition-all duration-200 hover:text-blue-600 dark:hover:text-white flex items-center justify-between border border-transparent hover:border-slate-200 dark:hover:border-slate-600"
-                            :class="item.level > 0 ? 'text-slate-500 dark:text-slate-400 font-normal pr-2.5' : 'text-slate-700 dark:text-slate-300 font-semibold pr-3'"
-                            :style="'padding-left: ' + (12 + (item.level || 0) * 16) + 'px'">
+                            class="w-full text-left py-2 rounded-xl text-xs sm:text-sm transition-all duration-200 flex items-center justify-between border border-transparent epub-toc-btn"
+                            :class="item.level > 0 ? 'font-normal pr-2.5' : 'font-semibold pr-3'"
+                            :style="'padding-left: ' + (12 + (item.level || 0) * 16) + 'px; border-color: transparent;'">
                             <span class="truncate pr-2" x-text="item.label"></span>
                             <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 flex-shrink-0"></i>
                         </button>
@@ -3951,48 +4252,40 @@
                 class="absolute inset-0 bg-black/30 dark:bg-black/50 z-30 transition-opacity duration-300"></div>
 
             <!-- Ebook Frame Center View -->
-            <div
-                class="flex-1 flex flex-col items-center justify-center p-4 relative bg-slate-100/30 dark:bg-slate-950/20">
+            <div class="flex-1 flex flex-col items-center justify-center p-4 relative" style="background-color: rgba(0, 0, 0, 0.05);">
                 <!-- Spinner/Loader with Progress -->
                 <div x-show="epubViewer.loading" x-cloak
-                    class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white dark:bg-slate-900 z-10">
-                    <div
-                        class="w-14 h-14 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin">
-                    </div>
-                    <p class="text-sm font-bold text-slate-700 dark:text-slate-200 truncate max-w-[80%] text-center"
-                        x-text="epubViewer.file?.filename"></p>
-                    <p class="text-xs text-slate-400 font-medium animate-pulse" x-text="t('loading')"></p>
+                    :style="'background-color: var(--epub-bg); color: var(--epub-fg);'"
+                    class="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
+                    <div class="w-14 h-14 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin"></div>
+                    <p class="text-sm font-bold truncate max-w-[80%] text-center" x-text="epubViewer.file?.filename"></p>
+                    <p class="text-xs font-medium animate-pulse text-slate-400" x-text="t('loading')"></p>
                 </div>
 
                 <!-- epub-viewer-area Container -->
-                <div id="epub-viewer-area"
-                    class="h-full w-full max-w-4xl mx-auto shadow-sm rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 p-2 sm:p-6 overflow-hidden">
-                </div>
+                <div id="epub-viewer-area" 
+                    :style="'background-color: var(--epub-bg); border-color: var(--epub-border); color: var(--epub-fg);'"
+                    class="h-full w-full max-w-4xl mx-auto shadow-sm rounded-2xl border p-2 sm:p-6 overflow-hidden"></div>
             </div>
         </div>
 
         <!-- Bottom progress slider -->
-        <footer
-            class="relative z-30 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700/50 p-3 sm:px-6 flex items-center justify-between gap-4">
-            <!-- Prev chapter -->
+        <footer :style="'background-color: var(--epub-footer-bg); border-color: var(--epub-border); color: var(--epub-fg);'"
+            class="relative z-30 border-t p-3 sm:px-6 flex items-center justify-between gap-4">
             <button @click="prevEpubChapter()" :disabled="epubViewer.currentChapter <= 0"
-                class="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300">
+                class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                 <i class="fa-solid fa-chevron-left"></i>
             </button>
-
-            <!-- Progress bar -->
             <div class="flex-1 flex items-center gap-3">
-                <div class="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2 relative overflow-hidden">
+                <div class="flex-1 rounded-full h-2 relative overflow-hidden bg-black/10 dark:bg-white/10">
                     <div class="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-300"
                         :style="`width: ${epubViewer.pageProgress}%`"></div>
                 </div>
-                <span class="text-xs font-bold font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap"
+                <span class="text-xs font-bold font-mono opacity-80 whitespace-nowrap"
                     x-text="(epubViewer.currentChapter + 1) + ' / ' + epubViewer.spine.length"></span>
             </div>
-
-            <!-- Next chapter -->
             <button @click="nextEpubChapter()" :disabled="epubViewer.currentChapter >= epubViewer.spine.length - 1"
-                class="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300">
+                class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                 <i class="fa-solid fa-chevron-right"></i>
             </button>
         </footer>
@@ -4006,6 +4299,8 @@
         x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
         @keyup.window.right="pdfNextPage()" @keyup.window.left="pdfPrevPage()"
+        @keydown.window.down="if (pdfViewer.show) { $event.preventDefault(); if (pdfViewer.scrollMode === 'continuous') { document.getElementById('pdf-continuous-container').scrollBy({ top: 100, behavior: 'smooth' }); } else { pdfNextPage(); } }"
+        @keydown.window.up="if (pdfViewer.show) { $event.preventDefault(); if (pdfViewer.scrollMode === 'continuous') { document.getElementById('pdf-continuous-container').scrollBy({ top: -100, behavior: 'smooth' }); } else { pdfPrevPage(); } }"
         @keyup.window.escape="pdfViewer.show && closePdfViewer()">
 
         <!-- Top Header Panel -->
@@ -4243,8 +4538,11 @@
 
                 <!-- pdf-viewer-area Container -->
                 <div id="pdf-viewer-area"
-                    class="h-full w-full max-w-4xl mx-auto shadow-sm rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 flex items-start justify-center relative"
-                    :class="pdfViewer.scrollMode === 'continuous' ? 'p-0 overflow-hidden' : 'p-2 sm:p-4 overflow-auto'">
+                    :class="[
+                        pdfViewer.scrollMode === 'continuous' ? 'p-0 overflow-hidden' : 'p-2 sm:p-4',
+                        (pdfViewer.zoom !== 'width' && pdfViewer.zoom !== 'height') ? 'overflow-auto block cursor-grab' : 'overflow-hidden flex items-center justify-center'
+                    ]"
+                    class="h-full w-full max-w-4xl mx-auto shadow-sm rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 relative">
                     <!-- Page rendering indicator -->
                     <div x-show="pdfViewer.pageLoading && pdfViewer.scrollMode === 'page'" x-cloak
                         class="absolute top-4 right-4 z-20 bg-slate-800/80 backdrop-blur text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-2 shadow font-bold">
@@ -4255,6 +4553,7 @@
 
                     <!-- The canvas itself -->
                     <canvas x-show="pdfViewer.scrollMode === 'page'" id="pdf-canvas"
+                        @dblclick="togglePdfZoom($event)"
                         :class="pdfViewer.darkModeFilter ? 'pdf-canvas-invert' : ''"
                         class="shadow-lg transition-transform duration-200 origin-top"></canvas>
 
@@ -4276,8 +4575,7 @@
         </div>
 
         <!-- Bottom progress slider -->
-        <footer
-            class="relative z-30 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700/50 p-3 sm:px-6 flex items-center justify-between gap-4">
+        <footer class="relative z-30 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700/50 p-3 sm:px-6 flex items-center justify-between gap-4">
             <!-- Prev page -->
             <button @click="pdfPrevPage()" :disabled="pdfViewer.currentPage <= 1"
                 class="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300">
@@ -4290,8 +4588,15 @@
                     <div class="bg-gradient-to-r from-red-500 to-rose-600 h-full rounded-full transition-all duration-300"
                         :style="`width: ${pdfViewer.pageProgress}%`"></div>
                 </div>
-                <span class="text-xs font-bold font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap"
-                    x-text="pdfViewer.currentPage + ' / ' + pdfViewer.numPages"></span>
+                <div class="flex items-center gap-1.5 whitespace-nowrap">
+                    <input type="number" 
+                        :value="pdfViewer.currentPage" 
+                        @change="const p = parseInt($event.target.value, 10); if(p >= 1 && p <= pdfViewer.numPages) { pdfJumpToPage(p); } else { $event.target.value = pdfViewer.currentPage; }"
+                        class="w-12 text-center py-0.5 text-xs font-bold font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-red-500"
+                        min="1" 
+                        :max="pdfViewer.numPages">
+                    <span class="text-xs font-bold font-mono text-slate-500 dark:text-slate-400">/ <span x-text="pdfViewer.numPages"></span></span>
+                </div>
             </div>
 
             <!-- Next page -->

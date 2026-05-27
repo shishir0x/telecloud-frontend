@@ -11,26 +11,53 @@
 
 import Alpine from 'alpinejs';
 import collapse from '@alpinejs/collapse';
-import Plyr from 'plyr';
-import Artplayer from 'artplayer';
-import Prism from 'prismjs';
-
-
-// Import Prism languages
-import 'prismjs/components/prism-json';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-go';
-import 'prismjs/components/prism-bash';
-import 'prismjs/components/prism-yaml';
-import 'prismjs/components/prism-sql';
 
 Alpine.plugin(collapse);
 window.Alpine = Alpine;
-window.Plyr = Plyr;
-window.Artplayer = Artplayer;
-Artplayer.option.logger = false;
-window.Prism = Prism;
+
+// Asynchronous loader helper for Artplayer & Plyr
+async function ensurePlayersLoaded() {
+    if (window.Artplayer && window.Plyr) return;
+    const [artModule, plyrModule] = await Promise.all([
+        import('artplayer'),
+        import('plyr')
+    ]);
+    window.Artplayer = artModule.default;
+    window.Plyr = plyrModule.default;
+    window.Artplayer.option.logger = false;
+}
+
+// Asynchronous loader helper for PrismJS syntax highlighter
+async function ensurePrismLoaded() {
+    if (window.Prism) return;
+    const prismMod = await import('prismjs');
+    window.Prism = prismMod.default;
+    // Load language files in parallel
+    await Promise.all([
+        import('prismjs/components/prism-json'),
+        import('prismjs/components/prism-javascript'),
+        import('prismjs/components/prism-python'),
+        import('prismjs/components/prism-go'),
+        import('prismjs/components/prism-bash'),
+        import('prismjs/components/prism-yaml'),
+        import('prismjs/components/prism-sql')
+    ]);
+}
+
+// Asynchronous loader helper for PDF.js (lazy load)
+async function ensurePdfLoaded() {
+    if (window.pdfjsLib) return;
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = `/static/js/pdf.min.js?v=${window.TELECLOUD_VERSION || 'dev'}`;
+        script.onload = () => {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = `/static/js/pdf.worker.min.js?v=${window.TELECLOUD_VERSION || 'dev'}`;
+            resolve();
+        };
+        script.onerror = () => reject(new Error('Failed to load PDF.js'));
+        document.head.appendChild(script);
+    });
+}
 
 const artplayerI18n = {
     'vi': {
@@ -214,7 +241,7 @@ window.cloudApp = cloudApp;
 window.shareApp = shareApp;
 window.shareFileApp = shareFileApp;
 
-function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnabled = false, webdavUser = '', webdavPassword = '', uploadAPIEnabled = false, uploadAPIKey = '', globalWebdavEnabled = true, globalAPIEnabled = true, webauthnRPID = '', webauthnOrigins = '', initialTheme = 'system', s3Enabled = false, s3AccessKey = '', s3SecretKey = '', globalS3Enabled = true, forceChange = false, logGroupId = '', initialBotTokens = '', initialBotStatuses = '{}') {
+function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnabled = false, webdavUser = '', webdavPassword = '', uploadAPIEnabled = false, uploadAPIKey = '', globalWebdavEnabled = true, globalAPIEnabled = true, webauthnRPID = '', webauthnOrigins = '', initialTheme = 'system', s3Enabled = false, s3AccessKey = '', s3SecretKey = '', globalS3Enabled = true, forceChange = false, logGroupId = '', initialBotTokens = '', initialBotStatuses = '{}', initialTelegramUserId = '', initialBotPoolUploadFolder = '') {
     return {
         isLoggedIn: initialIsLoggedIn,
         isAdmin: isAdmin,
@@ -260,6 +287,13 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         logGroupId: logGroupId,
         botTokens: initialBotTokens ? initialBotTokens.split(',').filter(t => t.trim() !== '').map(t => ({ value: t, isSaved: true })) : [],
         botStatuses: initialBotStatuses ? JSON.parse(initialBotStatuses) : {},
+        botAdminIds: '',
+        botPoolUploadFolder: '',
+        botUserSettingsForm: {
+            telegramUserId: initialTelegramUserId || '',
+            botPoolUploadFolder: initialBotPoolUploadFolder || 'TelegramUpload'
+        },
+        botUserSettingsLoading: false,
         botLoading: false,
         restartingApp: false,
         addBotToken() {
@@ -312,7 +346,11 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': TeleCloud.getCsrfToken()
                     },
-                    body: JSON.stringify({ tokens: filteredTokens })
+                    body: JSON.stringify({
+                        tokens: filteredTokens,
+                        admin_ids: this.botAdminIds,
+                        upload_folder: this.botPoolUploadFolder
+                    })
                 });
                 let res = await r.json();
                 if (!r.ok) throw new Error(res.error || 'Failed to save bot pool');
@@ -345,6 +383,34 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 this.showToast(e.message, 'error');
             } finally {
                 this.botLoading = false;
+            }
+        },
+        async saveBotUserSettings() {
+            this.botUserSettingsLoading = true;
+            try {
+                let r = await fetch('/api/settings/bot-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': TeleCloud.getCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        telegram_user_id: this.botUserSettingsForm.telegramUserId,
+                        bot_pool_upload_folder: this.botUserSettingsForm.botPoolUploadFolder
+                    })
+                });
+                let res = await r.json();
+                if (!r.ok) {
+                    if (res.error) {
+                        throw new Error(this.t(res.error) || res.error);
+                    }
+                    throw new Error('Failed to save bot user settings');
+                }
+                this.showToast(this.t('toast_bot_user_saved') || 'Telegram bot upload settings saved successfully!', 'success');
+            } catch (err) {
+                this.showToast(err.message, 'error');
+            } finally {
+                this.botUserSettingsLoading = false;
             }
         },
         async restartApp() {
@@ -1262,8 +1328,8 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 }
             }, 3000);
         },
-        comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false },
-        epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '' },
+        comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
+        epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
         pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         modal: { show: false, type: 'alert', title: '', message: '', input: '', resolve: null, isDanger: false, inputType: 'text', applyToAll: false },
@@ -3327,6 +3393,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.comicViewer.file = file;
             this.comicViewer.pages = [];
             this.comicViewer.pageUrls = [];
+            this.comicViewer.zoomActive = false;
             
             let savedPage = 0;
             if (file && file.id) {
@@ -3342,6 +3409,18 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.comicViewer.scrollMode = 'page';
             this.comicViewer.loading = true;
             this.comicViewer.settingsOpen = false;
+
+            let savedDirection = 'ltr';
+            try { savedDirection = localStorage.getItem('comic-reader-direction') || 'ltr'; } catch(e) {}
+            this.comicViewer.direction = savedDirection;
+
+            let savedViewMode = 'single';
+            try { savedViewMode = localStorage.getItem('comic-reader-view-mode') || 'single'; } catch(e) {}
+            this.comicViewer.viewMode = savedViewMode;
+
+            let savedFilter = 'none';
+            try { savedFilter = localStorage.getItem('comic-reader-filter') || 'none'; } catch(e) {}
+            this.comicViewer.filter = savedFilter;
             
             const hasShareToken = !!(this.shareToken || this.token || shareToken);
             const token = this.shareToken || this.token || shareToken;
@@ -3434,18 +3513,184 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.comicViewer.pageLoading = true;
         },
         nextComicPage() {
-            if (this.comicViewer.currentPageIndex < this.comicViewer.pages.length - 1) {
-                this.comicViewer.currentPageIndex++;
+            this.comicViewer.zoomActive = false;
+            this.changeComicPageIndex(1);
+        },
+        prevComicPage() {
+            this.comicViewer.zoomActive = false;
+            this.changeComicPageIndex(-1);
+        },
+        handleComicTouchStart(e) {
+            if (this.comicViewer.zoomActive || this.comicViewer.scrollMode !== 'page') return;
+            this.comicViewer.touchStartX = e.changedTouches[0].screenX;
+            this.comicViewer.touchStartY = e.changedTouches[0].screenY;
+        },
+        handleComicTouchEnd(e) {
+            if (this.comicViewer.zoomActive || this.comicViewer.scrollMode !== 'page') return;
+            const endX = e.changedTouches[0].screenX;
+            const endY = e.changedTouches[0].screenY;
+            const diffX = endX - this.comicViewer.touchStartX;
+            const diffY = endY - this.comicViewer.touchStartY;
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                const isRTL = this.comicViewer.direction === 'rtl';
+                if (diffX > 0) {
+                    if (isRTL) this.nextComicPage();
+                    else this.prevComicPage();
+                } else {
+                    if (isRTL) this.prevComicPage();
+                    else this.nextComicPage();
+                }
+            }
+        },
+        changeComicPageIndex(logicalStep) {
+            const pagesCount = this.comicViewer.pages.length;
+            if (pagesCount <= 0) return;
+            
+            let cur = this.comicViewer.currentPageIndex;
+            let target = cur;
+            const viewMode = this.comicViewer.viewMode || 'single';
+            
+            if (viewMode === 'single') {
+                target = cur + logicalStep;
+            } else if (viewMode === 'double') {
+                if (cur % 2 !== 0) {
+                    cur = cur - 1;
+                }
+                target = cur + (logicalStep * 2);
+                if (target < 0) target = 0;
+            }
+            
+            if (target < 0) target = 0;
+            if (target >= pagesCount) {
+                if (viewMode === 'double') {
+                    target = Math.floor((pagesCount - 1) / 2) * 2;
+                } else {
+                    target = pagesCount - 1;
+                }
+            }
+            
+            if (target !== this.comicViewer.currentPageIndex) {
+                this.comicViewer.currentPageIndex = target;
                 this.loadComicPage();
-                this.preloadNextComicPage();
+                if (logicalStep > 0) {
+                    this.preloadNextComicPage();
+                }
                 this.saveComicProgress();
             }
         },
-        prevComicPage() {
-            if (this.comicViewer.currentPageIndex > 0) {
-                this.comicViewer.currentPageIndex--;
-                this.loadComicPage();
-                this.saveComicProgress();
+        getComicPagesToRender() {
+            const pagesCount = this.comicViewer.pages.length;
+            if (pagesCount <= 0) return [];
+            
+            const cur = this.comicViewer.currentPageIndex;
+            const viewMode = this.comicViewer.viewMode || 'single';
+            
+            if (viewMode === 'single' || this.comicViewer.scrollMode === 'continuous') {
+                return [cur];
+            }
+            
+            if (viewMode === 'double') {
+                let pairStart = cur;
+                if (cur % 2 !== 0) {
+                    pairStart = cur - 1;
+                }
+                const result = [pairStart];
+                if (pairStart + 1 < pagesCount) {
+                    result.push(pairStart + 1);
+                }
+                return result;
+            }
+            
+            return [cur];
+        },
+        setComicDirection(dir) {
+            this.comicViewer.direction = dir;
+            try { localStorage.setItem('comic-reader-direction', dir); } catch(e) {}
+        },
+        setComicViewMode(mode) {
+            this.comicViewer.viewMode = mode;
+            try { localStorage.setItem('comic-reader-view-mode', mode); } catch(e) {}
+            if (mode !== 'single') {
+                let cur = this.comicViewer.currentPageIndex;
+                if (mode === 'double') {
+                    if (cur % 2 !== 0) {
+                        this.comicViewer.currentPageIndex = Math.max(0, cur - 1);
+                    }
+                }
+            }
+        },
+        setComicFilter(filter) {
+            this.comicViewer.filter = filter;
+            try { localStorage.setItem('comic-reader-filter', filter); } catch(e) {}
+        },
+        getComicFilterStyle() {
+            const f = this.comicViewer.filter || 'none';
+            if (f === 'eye-care') return 'sepia(0.35) saturate(1.2) hue-rotate(-10deg)';
+            if (f === 'sepia') return 'sepia(0.85) contrast(0.95)';
+            if (f === 'contrast') return 'contrast(1.4) brightness(1.05)';
+            if (f === 'grayscale') return 'grayscale(1) contrast(1.1)';
+            return 'none';
+        },
+        toggleComicZoom(event) {
+            if (this.comicViewer.scrollMode !== 'page') return;
+            this.comicViewer.zoomActive = !this.comicViewer.zoomActive;
+            if (this.comicViewer.zoomActive) {
+                this.$nextTick(() => {
+                    const container = event.target.closest('.overflow-auto') || event.target.parentElement;
+                    if (container) {
+                        let isDown = false;
+                        let startX, startY;
+                        let scrollLeft, scrollTop;
+                        
+                        const onMouseDown = (e) => {
+                            if (!this.comicViewer.zoomActive) return;
+                            isDown = true;
+                            container.classList.add('cursor-grabbing');
+                            startX = e.pageX - container.offsetLeft;
+                            startY = e.pageY - container.offsetTop;
+                            scrollLeft = container.scrollLeft;
+                            scrollTop = container.scrollTop;
+                        };
+                        
+                        const onMouseLeaveOrUp = () => {
+                            isDown = false;
+                            container.classList.remove('cursor-grabbing');
+                        };
+                        
+                        const onMouseMove = (e) => {
+                            if (!isDown || !this.comicViewer.zoomActive) return;
+                            e.preventDefault();
+                            const x = e.pageX - container.offsetLeft;
+                            const y = e.pageY - container.offsetTop;
+                            const walkX = (x - startX) * 1.5;
+                            const walkY = (y - startY) * 1.5;
+                            container.scrollLeft = scrollLeft - walkX;
+                            container.scrollTop = scrollTop - walkY;
+                        };
+                        
+                        container.removeEventListener('mousedown', container._onMouseDown);
+                        container.removeEventListener('mouseleave', container._onMouseLeave);
+                        container.removeEventListener('mouseup', container._onMouseUp);
+                        container.removeEventListener('mousemove', container._onMouseMove);
+                        
+                        container._onMouseDown = onMouseDown;
+                        container._onMouseLeave = onMouseLeaveOrUp;
+                        container._onMouseUp = onMouseLeaveOrUp;
+                        container._onMouseMove = onMouseMove;
+                        
+                        container.addEventListener('mousedown', onMouseDown);
+                        container.addEventListener('mouseleave', onMouseLeaveOrUp);
+                        container.addEventListener('mouseup', onMouseLeaveOrUp);
+                        container.addEventListener('mousemove', onMouseMove);
+                    }
+                });
+            } else {
+                const container = event.target.closest('.overflow-auto') || event.target.parentElement;
+                if (container) {
+                    container.classList.remove('cursor-grabbing');
+                    container.scrollLeft = 0;
+                    container.scrollTop = 0;
+                }
             }
         },
         preloadNextComicPage() {
@@ -3557,6 +3802,15 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.epubViewer.currentChapter = 0;
             this.epubViewer.title = '';
             this.epubViewer.settingsOpen = false;
+            
+            // Restore theme & fontFamily
+            let savedTheme = 'system';
+            try { savedTheme = localStorage.getItem('epub-reader-theme') || 'system'; } catch(e) {}
+            this.epubViewer.theme = savedTheme;
+
+            let savedFontFamily = 'sans-serif';
+            try { savedFontFamily = localStorage.getItem('epub-reader-font-family') || 'sans-serif'; } catch(e) {}
+            this.epubViewer.fontFamily = savedFontFamily;
             
             const token = this.shareToken || this.token || shareToken || '';
             const hasShareToken = !!token;
@@ -3814,8 +4068,31 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             const doc = iframe.contentDocument;
             const win = iframe.contentWindow;
             const isDark = document.documentElement.classList.contains('dark');
-            const bg = isDark ? '#1e293b' : '#ffffff';
-            const fg = isDark ? '#f1f5f9' : '#0f172a';
+            
+            let themeKey = this.epubViewer.theme || 'system';
+            if (themeKey === 'system') {
+                themeKey = isDark ? 'dark' : 'light';
+            }
+            
+            const EPUB_THEMES = {
+                light: { bg: '#ffffff', fg: '#0f172a', scrollbarThumb: '#cbd5e1', scrollbarThumbHover: '#94a3b8' },
+                dark: { bg: '#0f172a', fg: '#f1f5f9', scrollbarThumb: '#475569', scrollbarThumbHover: '#64748b' },
+                sepia: { bg: '#f4ecd8', fg: '#433422', scrollbarThumb: '#cbbb97', scrollbarThumbHover: '#ab9c78' },
+                cream: { bg: '#faf6ee', fg: '#2c2c2c', scrollbarThumb: '#d5c4b1', scrollbarThumbHover: '#c5b19b' },
+                olive: { bg: '#e8f5e9', fg: '#1b4332', scrollbarThumb: '#a3cfad', scrollbarThumbHover: '#82ba8f' }
+            };
+            
+            const theme = EPUB_THEMES[themeKey] || EPUB_THEMES.light;
+            const bg = theme.bg;
+            const fg = theme.fg;
+            
+            const FONT_FAMILIES = {
+                'sans-serif': 'Inter, system-ui, -apple-system, sans-serif',
+                'serif': 'Georgia, Cambria, "Times New Roman", serif',
+                'monospace': 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                'dyslexic': '"Comic Sans MS", "Chalkboard SE", sans-serif'
+            };
+            const font = FONT_FAMILIES[this.epubViewer.fontFamily || 'sans-serif'] || FONT_FAMILIES['sans-serif'];
             
             let style = doc.getElementById('tc-epub-theme');
             if (!style) {
@@ -3824,8 +4101,8 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 doc.head.appendChild(style);
             }
             style.textContent = `
-                body { background: ${bg} !important; color: ${fg} !important; font-size: ${this.epubViewer.fontSize}% !important; line-height: 1.6 !important; padding: 20px !important; max-width: 800px !important; margin: 0 auto !important; font-family: Inter, system-ui, -apple-system, sans-serif !important; }
-                p, span, div, li, td, th, h1, h2, h3, h4, h5, h6 { color: ${fg} !important; }
+                body { background: ${bg} !important; color: ${fg} !important; font-size: ${this.epubViewer.fontSize}% !important; line-height: 1.6 !important; padding: 20px !important; max-width: 800px !important; margin: 0 auto !important; font-family: ${font} !important; }
+                p, span, div, li, td, th, h1, h2, h3, h4, h5, h6 { color: ${fg} !important; font-family: ${font} !important; }
                 a { color: #3b82f6 !important; }
                 img, svg { max-width: 100% !important; height: auto !important; }
                 
@@ -3838,12 +4115,91 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     background: transparent;
                 }
                 ::-webkit-scrollbar-thumb {
-                    background: ${isDark ? '#475569' : '#cbd5e1'};
+                    background: ${theme.scrollbarThumb};
                     border-radius: 4px;
                 }
                 ::-webkit-scrollbar-thumb:hover {
-                    background: ${isDark ? '#64748b' : '#94a3b8'};
+                    background: ${theme.scrollbarThumbHover};
                 }
+            `;
+        },
+        setEpubTheme(theme) {
+            this.epubViewer.theme = theme;
+            try { localStorage.setItem('epub-reader-theme', theme); } catch(e) {}
+            this.applyEpubTheme();
+        },
+        setEpubFontFamily(fontFamily) {
+            this.epubViewer.fontFamily = fontFamily;
+            try { localStorage.setItem('epub-reader-font-family', fontFamily); } catch(e) {}
+            this.applyEpubTheme();
+        },
+        getEpubThemeStyles() {
+            const isDark = document.documentElement.classList.contains('dark');
+            let themeKey = this.epubViewer.theme || 'system';
+            if (themeKey === 'system') {
+                themeKey = isDark ? 'dark' : 'light';
+            }
+            
+            const EPUB_THEMES = {
+                light: {
+                    bg: '#ffffff',
+                    fg: '#0f172a',
+                    headerBg: '#f8fafc',
+                    sidebarBg: '#f8fafc',
+                    footerBg: '#f8fafc',
+                    border: '#e2e8f0',
+                    hoverBg: 'rgba(15, 23, 42, 0.05)'
+                },
+                dark: {
+                    bg: '#0f172a',
+                    fg: '#f1f5f9',
+                    headerBg: '#1e293b',
+                    sidebarBg: '#1e293b',
+                    footerBg: '#1e293b',
+                    border: '#334155',
+                    hoverBg: 'rgba(241, 245, 249, 0.1)'
+                },
+                sepia: {
+                    bg: '#f4ecd8',
+                    fg: '#433422',
+                    headerBg: '#ebdcb9',
+                    sidebarBg: '#ebdcb9',
+                    footerBg: '#ebdcb9',
+                    border: '#decfa6',
+                    hoverBg: 'rgba(67, 52, 34, 0.08)'
+                },
+                cream: {
+                    bg: '#faf6ee',
+                    fg: '#2c2c2c',
+                    headerBg: '#f2eae0',
+                    sidebarBg: '#f2eae0',
+                    footerBg: '#f2eae0',
+                    border: '#e4d5c3',
+                    hoverBg: 'rgba(44, 44, 44, 0.06)'
+                },
+                olive: {
+                    bg: '#e8f5e9',
+                    fg: '#1b4332',
+                    headerBg: '#d4edda',
+                    sidebarBg: '#d4edda',
+                    footerBg: '#d4edda',
+                    border: '#c3e6cb',
+                    hoverBg: 'rgba(27, 67, 50, 0.08)'
+                }
+            };
+            
+            const theme = EPUB_THEMES[themeKey] || EPUB_THEMES.light;
+            
+            return `
+                background-color: ${theme.bg};
+                color: ${theme.fg};
+                --epub-bg: ${theme.bg};
+                --epub-fg: ${theme.fg};
+                --epub-header-bg: ${theme.headerBg};
+                --epub-sidebar-bg: ${theme.sidebarBg};
+                --epub-footer-bg: ${theme.footerBg};
+                --epub-border: ${theme.border};
+                --epub-hover-bg: ${theme.hoverBg};
             `;
         },
         changeEpubFontSize(delta) {
@@ -4012,6 +4368,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
 
             this.$nextTick(async () => {
                 try {
+                    await ensurePdfLoaded();
                     const loadingTask = pdfjsLib.getDocument({ url: downloadUrl, withCredentials: true });
                     window._pdfLoadingTask = loadingTask;
                     
@@ -4108,6 +4465,12 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     } else {
                         this.renderPdfPage(startPage);
                     }
+                    
+                    // Setup pinch-to-zoom gesture on the viewer area
+                    this.$nextTick(() => {
+                        const viewerArea = document.getElementById('pdf-viewer-area');
+                        if (viewerArea) this._setupPdfPinchZoom(viewerArea);
+                    });
 
                 } catch (err) {
                     console.error("PDF.js initialization failed:", err);
@@ -4272,6 +4635,132 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 this.renderPdfPage(this.pdfViewer.currentPage);
             }
         },
+        togglePdfZoom(event) {
+            if (this.pdfViewer.scrollMode !== 'page') return;
+            const currentZoom = this.pdfViewer.zoom;
+            let nextZoom = 200;
+            if (currentZoom === 200 || currentZoom === '200') {
+                nextZoom = 'height';
+            }
+            this.pdfSetZoom(nextZoom);
+            
+            this.$nextTick(() => {
+                const container = document.getElementById('pdf-viewer-area');
+                if (!container) return;
+                this._setupPdfDragPan(container, nextZoom);
+            });
+        },
+        _setupPdfDragPan(container, zoomVal) {
+            // Mouse drag-to-scroll panning
+            container.removeEventListener('mousedown', container._pdfMouseDown);
+            container.removeEventListener('mouseleave', container._pdfMouseLeave);
+            container.removeEventListener('mouseup', container._pdfMouseUp);
+            container.removeEventListener('mousemove', container._pdfMouseMove);
+            
+            if (zoomVal !== 200 && zoomVal !== '200') {
+                container.classList.remove('cursor-grabbing');
+                container.scrollLeft = 0;
+                container.scrollTop = 0;
+                return;
+            }
+            
+            let isDown = false;
+            let startX, startY, scrollLeft, scrollTop;
+            
+            container._pdfMouseDown = (e) => {
+                isDown = true;
+                container.classList.add('cursor-grabbing');
+                startX = e.pageX - container.offsetLeft;
+                startY = e.pageY - container.offsetTop;
+                scrollLeft = container.scrollLeft;
+                scrollTop = container.scrollTop;
+            };
+            container._pdfMouseLeave = () => { isDown = false; container.classList.remove('cursor-grabbing'); };
+            container._pdfMouseUp = () => { isDown = false; container.classList.remove('cursor-grabbing'); };
+            container._pdfMouseMove = (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - container.offsetLeft;
+                const y = e.pageY - container.offsetTop;
+                container.scrollLeft = scrollLeft - (x - startX) * 1.5;
+                container.scrollTop = scrollTop - (y - startY) * 1.5;
+            };
+            
+            container.addEventListener('mousedown', container._pdfMouseDown);
+            container.addEventListener('mouseleave', container._pdfMouseLeave);
+            container.addEventListener('mouseup', container._pdfMouseUp);
+            container.addEventListener('mousemove', container._pdfMouseMove);
+        },
+        _setupPdfPinchZoom(container) {
+            // Remove old listeners to avoid duplicates
+            if (container._pdfPinchStart) container.removeEventListener('touchstart', container._pdfPinchStart);
+            if (container._pdfPinchMove) container.removeEventListener('touchmove', container._pdfPinchMove);
+            if (container._pdfPinchEnd) container.removeEventListener('touchend', container._pdfPinchEnd);
+            
+            let initialDist = 0;
+            let initialZoom = 100;
+            let isPinching = false;
+            let touchScrollStartX = 0;
+            let touchScrollStartY = 0;
+            let scrollLeftStart = 0;
+            let scrollTopStart = 0;
+            
+            const getTouchDist = (t) => {
+                const dx = t[0].clientX - t[1].clientX;
+                const dy = t[0].clientY - t[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            };
+            
+            container._pdfPinchStart = (e) => {
+                if (this.pdfViewer.scrollMode !== 'page') return;
+                if (e.touches.length === 2) {
+                    isPinching = true;
+                    initialDist = getTouchDist(e.touches);
+                    const z = this.pdfViewer.zoom;
+                    initialZoom = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
+                    e.preventDefault();
+                } else if (e.touches.length === 1) {
+                    isPinching = false;
+                    touchScrollStartX = e.touches[0].clientX;
+                    touchScrollStartY = e.touches[0].clientY;
+                    scrollLeftStart = container.scrollLeft;
+                    scrollTopStart = container.scrollTop;
+                }
+            };
+            
+            container._pdfPinchMove = (e) => {
+                if (this.pdfViewer.scrollMode !== 'page') return;
+                if (e.touches.length === 2 && isPinching) {
+                    e.preventDefault();
+                    const dist = getTouchDist(e.touches);
+                    const ratio = dist / initialDist;
+                    const newZoom = Math.min(300, Math.max(50, Math.round(initialZoom * ratio / 25) * 25));
+                    if (newZoom !== this.pdfViewer.zoom) {
+                        this.pdfSetZoom(newZoom);
+                        this.$nextTick(() => {
+                            this._setupPdfDragPan(container, newZoom);
+                        });
+                    }
+                } else if (e.touches.length === 1 && !isPinching) {
+                    // Single finger scroll when zoomed in
+                    const z = this.pdfViewer.zoom;
+                    const curZoom = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
+                    if (curZoom > 100) {
+                        e.preventDefault();
+                        const dx = touchScrollStartX - e.touches[0].clientX;
+                        const dy = touchScrollStartY - e.touches[0].clientY;
+                        container.scrollLeft = scrollLeftStart + dx;
+                        container.scrollTop = scrollTopStart + dy;
+                    }
+                }
+            };
+            
+            container._pdfPinchEnd = () => { isPinching = false; };
+            
+            container.addEventListener('touchstart', container._pdfPinchStart, { passive: false });
+            container.addEventListener('touchmove', container._pdfPinchMove, { passive: false });
+            container.addEventListener('touchend', container._pdfPinchEnd);
+        },
         pdfNextPage() {
             if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
                 this.renderPdfPage(this.pdfViewer.currentPage + 1);
@@ -4293,11 +4782,26 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         pdfJumpToPage(page) {
             const p = parseInt(page);
             if (p >= 1 && p <= this.pdfViewer.numPages) {
-                this.renderPdfPage(p);
-                this.$nextTick(() => {
-                    const area = document.getElementById('pdf-viewer-area');
-                    if (area) area.scrollTop = 0;
-                });
+                if (this.pdfViewer.scrollMode === 'continuous') {
+                    this.pdfViewer.currentPage = p;
+                    this.$nextTick(() => {
+                        const container = document.getElementById('pdf-continuous-container') || 
+                                          document.getElementById('share-pdf-continuous-container') || 
+                                          document.getElementById('share-folder-pdf-continuous-container');
+                        if (container) {
+                            const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${p}"]`);
+                            if (wrapper) {
+                                wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }
+                    });
+                } else {
+                    this.renderPdfPage(p);
+                    this.$nextTick(() => {
+                        const area = document.getElementById('pdf-viewer-area');
+                        if (area) area.scrollTop = 0;
+                    });
+                }
             }
         },
         closePdfViewer() {
@@ -4534,7 +5038,8 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             const isUnsupportedMkv = (TeleCloud.isAppleDevice() && ext === 'mkv');
             this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: isMedia, mediaHtml: mediaHtml, isLarge: isLarge, isPreviewLoading: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: isUnsupportedMkv };
             if (playerTarget) {
-                setTimeout(() => {
+                setTimeout(async () => {
+                    await ensurePlayersLoaded();
                     if (this.playerInstance) this.playerInstance.destroy();
                     const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#3b82f6';
                     
@@ -4627,8 +5132,10 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 this.fileInfoModal.mediaHtml = mediaHtml;
                 this.fileInfoModal.isMedia = true;
                 
-                if (ext !== 'md' && window.Prism) {
-                    setTimeout(() => Prism.highlightAllUnder(document.querySelector('.text-preview-container')), 50);
+                if (ext !== 'md') {
+                    ensurePrismLoaded().then(() => {
+                        setTimeout(() => window.Prism.highlightAllUnder(document.querySelector('.text-preview-container')), 50);
+                    });
                 }
             } catch (e) {
                 console.error("Preview failed", e);
@@ -5162,8 +5669,8 @@ function shareApp() {
                 }
             }, 3000);
         },
-        comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false },
-        epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '' },
+        comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
+        epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
         pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
@@ -5515,6 +6022,7 @@ function shareApp() {
             this.comicViewer.file = file;
             this.comicViewer.pages = [];
             this.comicViewer.pageUrls = [];
+            this.comicViewer.zoomActive = false;
             
             let savedPage = 0;
             if (file && file.id) {
@@ -5530,6 +6038,18 @@ function shareApp() {
             this.comicViewer.scrollMode = 'page';
             this.comicViewer.loading = true;
             this.comicViewer.settingsOpen = false;
+
+            let savedDirection = 'ltr';
+            try { savedDirection = localStorage.getItem('comic-reader-direction') || 'ltr'; } catch(e) {}
+            this.comicViewer.direction = savedDirection;
+
+            let savedViewMode = 'single';
+            try { savedViewMode = localStorage.getItem('comic-reader-view-mode') || 'single'; } catch(e) {}
+            this.comicViewer.viewMode = savedViewMode;
+
+            let savedFilter = 'none';
+            try { savedFilter = localStorage.getItem('comic-reader-filter') || 'none'; } catch(e) {}
+            this.comicViewer.filter = savedFilter;
             
             const hasShareToken = !!(this.shareToken || this.token || shareToken);
             const token = this.shareToken || this.token || shareToken;
@@ -5630,18 +6150,184 @@ function shareApp() {
             img.src = pageUrl;
         },
         nextComicPage() {
-            if (this.comicViewer.currentPageIndex < this.comicViewer.pages.length - 1) {
-                this.comicViewer.currentPageIndex++;
+            this.comicViewer.zoomActive = false;
+            this.changeComicPageIndex(1);
+        },
+        prevComicPage() {
+            this.comicViewer.zoomActive = false;
+            this.changeComicPageIndex(-1);
+        },
+        handleComicTouchStart(e) {
+            if (this.comicViewer.zoomActive || this.comicViewer.scrollMode !== 'page') return;
+            this.comicViewer.touchStartX = e.changedTouches[0].screenX;
+            this.comicViewer.touchStartY = e.changedTouches[0].screenY;
+        },
+        handleComicTouchEnd(e) {
+            if (this.comicViewer.zoomActive || this.comicViewer.scrollMode !== 'page') return;
+            const endX = e.changedTouches[0].screenX;
+            const endY = e.changedTouches[0].screenY;
+            const diffX = endX - this.comicViewer.touchStartX;
+            const diffY = endY - this.comicViewer.touchStartY;
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                const isRTL = this.comicViewer.direction === 'rtl';
+                if (diffX > 0) {
+                    if (isRTL) this.nextComicPage();
+                    else this.prevComicPage();
+                } else {
+                    if (isRTL) this.prevComicPage();
+                    else this.nextComicPage();
+                }
+            }
+        },
+        changeComicPageIndex(logicalStep) {
+            const pagesCount = this.comicViewer.pages.length;
+            if (pagesCount <= 0) return;
+            
+            let cur = this.comicViewer.currentPageIndex;
+            let target = cur;
+            const viewMode = this.comicViewer.viewMode || 'single';
+            
+            if (viewMode === 'single') {
+                target = cur + logicalStep;
+            } else if (viewMode === 'double') {
+                if (cur % 2 !== 0) {
+                    cur = cur - 1;
+                }
+                target = cur + (logicalStep * 2);
+                if (target < 0) target = 0;
+            }
+            
+            if (target < 0) target = 0;
+            if (target >= pagesCount) {
+                if (viewMode === 'double') {
+                    target = Math.floor((pagesCount - 1) / 2) * 2;
+                } else {
+                    target = pagesCount - 1;
+                }
+            }
+            
+            if (target !== this.comicViewer.currentPageIndex) {
+                this.comicViewer.currentPageIndex = target;
                 this.loadComicPage();
-                this.preloadNextComicPage();
+                if (logicalStep > 0) {
+                    this.preloadNextComicPage();
+                }
                 this.saveComicProgress();
             }
         },
-        prevComicPage() {
-            if (this.comicViewer.currentPageIndex > 0) {
-                this.comicViewer.currentPageIndex--;
-                this.loadComicPage();
-                this.saveComicProgress();
+        getComicPagesToRender() {
+            const pagesCount = this.comicViewer.pages.length;
+            if (pagesCount <= 0) return [];
+            
+            const cur = this.comicViewer.currentPageIndex;
+            const viewMode = this.comicViewer.viewMode || 'single';
+            
+            if (viewMode === 'single' || this.comicViewer.scrollMode === 'continuous') {
+                return [cur];
+            }
+            
+            if (viewMode === 'double') {
+                let pairStart = cur;
+                if (cur % 2 !== 0) {
+                    pairStart = cur - 1;
+                }
+                const result = [pairStart];
+                if (pairStart + 1 < pagesCount) {
+                    result.push(pairStart + 1);
+                }
+                return result;
+            }
+            
+            return [cur];
+        },
+        setComicDirection(dir) {
+            this.comicViewer.direction = dir;
+            try { localStorage.setItem('comic-reader-direction', dir); } catch(e) {}
+        },
+        setComicViewMode(mode) {
+            this.comicViewer.viewMode = mode;
+            try { localStorage.setItem('comic-reader-view-mode', mode); } catch(e) {}
+            if (mode !== 'single') {
+                let cur = this.comicViewer.currentPageIndex;
+                if (mode === 'double') {
+                    if (cur % 2 !== 0) {
+                        this.comicViewer.currentPageIndex = Math.max(0, cur - 1);
+                    }
+                }
+            }
+        },
+        setComicFilter(filter) {
+            this.comicViewer.filter = filter;
+            try { localStorage.setItem('comic-reader-filter', filter); } catch(e) {}
+        },
+        getComicFilterStyle() {
+            const f = this.comicViewer.filter || 'none';
+            if (f === 'eye-care') return 'sepia(0.35) saturate(1.2) hue-rotate(-10deg)';
+            if (f === 'sepia') return 'sepia(0.85) contrast(0.95)';
+            if (f === 'contrast') return 'contrast(1.4) brightness(1.05)';
+            if (f === 'grayscale') return 'grayscale(1) contrast(1.1)';
+            return 'none';
+        },
+        toggleComicZoom(event) {
+            if (this.comicViewer.scrollMode !== 'page') return;
+            this.comicViewer.zoomActive = !this.comicViewer.zoomActive;
+            if (this.comicViewer.zoomActive) {
+                this.$nextTick(() => {
+                    const container = event.target.closest('.overflow-auto') || event.target.parentElement;
+                    if (container) {
+                        let isDown = false;
+                        let startX, startY;
+                        let scrollLeft, scrollTop;
+                        
+                        const onMouseDown = (e) => {
+                            if (!this.comicViewer.zoomActive) return;
+                            isDown = true;
+                            container.classList.add('cursor-grabbing');
+                            startX = e.pageX - container.offsetLeft;
+                            startY = e.pageY - container.offsetTop;
+                            scrollLeft = container.scrollLeft;
+                            scrollTop = container.scrollTop;
+                        };
+                        
+                        const onMouseLeaveOrUp = () => {
+                            isDown = false;
+                            container.classList.remove('cursor-grabbing');
+                        };
+                        
+                        const onMouseMove = (e) => {
+                            if (!isDown || !this.comicViewer.zoomActive) return;
+                            e.preventDefault();
+                            const x = e.pageX - container.offsetLeft;
+                            const y = e.pageY - container.offsetTop;
+                            const walkX = (x - startX) * 1.5;
+                            const walkY = (y - startY) * 1.5;
+                            container.scrollLeft = scrollLeft - walkX;
+                            container.scrollTop = scrollTop - walkY;
+                        };
+                        
+                        container.removeEventListener('mousedown', container._onMouseDown);
+                        container.removeEventListener('mouseleave', container._onMouseLeave);
+                        container.removeEventListener('mouseup', container._onMouseUp);
+                        container.removeEventListener('mousemove', container._onMouseMove);
+                        
+                        container._onMouseDown = onMouseDown;
+                        container._onMouseLeave = onMouseLeaveOrUp;
+                        container._onMouseUp = onMouseLeaveOrUp;
+                        container._onMouseMove = onMouseMove;
+                        
+                        container.addEventListener('mousedown', onMouseDown);
+                        container.addEventListener('mouseleave', onMouseLeaveOrUp);
+                        container.addEventListener('mouseup', onMouseLeaveOrUp);
+                        container.addEventListener('mousemove', onMouseMove);
+                    }
+                });
+            } else {
+                const container = event.target.closest('.overflow-auto') || event.target.parentElement;
+                if (container) {
+                    container.classList.remove('cursor-grabbing');
+                    container.scrollLeft = 0;
+                    container.scrollTop = 0;
+                }
             }
         },
         preloadNextComicPage() {
@@ -5743,6 +6429,15 @@ function shareApp() {
             this.epubViewer.currentChapter = 0;
             this.epubViewer.title = '';
             this.epubViewer.settingsOpen = false;
+            
+            // Restore theme & fontFamily
+            let savedTheme = 'system';
+            try { savedTheme = localStorage.getItem('epub-reader-theme') || 'system'; } catch(e) {}
+            this.epubViewer.theme = savedTheme;
+
+            let savedFontFamily = 'sans-serif';
+            try { savedFontFamily = localStorage.getItem('epub-reader-font-family') || 'sans-serif'; } catch(e) {}
+            this.epubViewer.fontFamily = savedFontFamily;
             
             const token = this.shareToken || this.token || shareToken || '';
             const hasShareToken = !!token;
@@ -6000,8 +6695,31 @@ function shareApp() {
             const doc = iframe.contentDocument;
             const win = iframe.contentWindow;
             const isDark = document.documentElement.classList.contains('dark');
-            const bg = isDark ? '#1e293b' : '#ffffff';
-            const fg = isDark ? '#f1f5f9' : '#0f172a';
+            
+            let themeKey = this.epubViewer.theme || 'system';
+            if (themeKey === 'system') {
+                themeKey = isDark ? 'dark' : 'light';
+            }
+            
+            const EPUB_THEMES = {
+                light: { bg: '#ffffff', fg: '#0f172a', scrollbarThumb: '#cbd5e1', scrollbarThumbHover: '#94a3b8' },
+                dark: { bg: '#0f172a', fg: '#f1f5f9', scrollbarThumb: '#475569', scrollbarThumbHover: '#64748b' },
+                sepia: { bg: '#f4ecd8', fg: '#433422', scrollbarThumb: '#cbbb97', scrollbarThumbHover: '#ab9c78' },
+                cream: { bg: '#faf6ee', fg: '#2c2c2c', scrollbarThumb: '#d5c4b1', scrollbarThumbHover: '#c5b19b' },
+                olive: { bg: '#e8f5e9', fg: '#1b4332', scrollbarThumb: '#a3cfad', scrollbarThumbHover: '#82ba8f' }
+            };
+            
+            const theme = EPUB_THEMES[themeKey] || EPUB_THEMES.light;
+            const bg = theme.bg;
+            const fg = theme.fg;
+            
+            const FONT_FAMILIES = {
+                'sans-serif': 'Inter, system-ui, -apple-system, sans-serif',
+                'serif': 'Georgia, Cambria, "Times New Roman", serif',
+                'monospace': 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                'dyslexic': '"Comic Sans MS", "Chalkboard SE", sans-serif'
+            };
+            const font = FONT_FAMILIES[this.epubViewer.fontFamily || 'sans-serif'] || FONT_FAMILIES['sans-serif'];
             
             let style = doc.getElementById('tc-epub-theme');
             if (!style) {
@@ -6010,8 +6728,8 @@ function shareApp() {
                 doc.head.appendChild(style);
             }
             style.textContent = `
-                body { background: ${bg} !important; color: ${fg} !important; font-size: ${this.epubViewer.fontSize}% !important; line-height: 1.6 !important; padding: 20px !important; max-width: 800px !important; margin: 0 auto !important; font-family: Inter, system-ui, -apple-system, sans-serif !important; }
-                p, span, div, li, td, th, h1, h2, h3, h4, h5, h6 { color: ${fg} !important; }
+                body { background: ${bg} !important; color: ${fg} !important; font-size: ${this.epubViewer.fontSize}% !important; line-height: 1.6 !important; padding: 20px !important; max-width: 800px !important; margin: 0 auto !important; font-family: ${font} !important; }
+                p, span, div, li, td, th, h1, h2, h3, h4, h5, h6 { color: ${fg} !important; font-family: ${font} !important; }
                 a { color: #3b82f6 !important; }
                 img, svg { max-width: 100% !important; height: auto !important; }
                 
@@ -6024,12 +6742,91 @@ function shareApp() {
                     background: transparent;
                 }
                 ::-webkit-scrollbar-thumb {
-                    background: ${isDark ? '#475569' : '#cbd5e1'};
+                    background: ${theme.scrollbarThumb};
                     border-radius: 4px;
                 }
                 ::-webkit-scrollbar-thumb:hover {
-                    background: ${isDark ? '#64748b' : '#94a3b8'};
+                    background: ${theme.scrollbarThumbHover};
                 }
+            `;
+        },
+        setEpubTheme(theme) {
+            this.epubViewer.theme = theme;
+            try { localStorage.setItem('epub-reader-theme', theme); } catch(e) {}
+            this.applyEpubTheme();
+        },
+        setEpubFontFamily(fontFamily) {
+            this.epubViewer.fontFamily = fontFamily;
+            try { localStorage.setItem('epub-reader-font-family', fontFamily); } catch(e) {}
+            this.applyEpubTheme();
+        },
+        getEpubThemeStyles() {
+            const isDark = document.documentElement.classList.contains('dark');
+            let themeKey = this.epubViewer.theme || 'system';
+            if (themeKey === 'system') {
+                themeKey = isDark ? 'dark' : 'light';
+            }
+            
+            const EPUB_THEMES = {
+                light: {
+                    bg: '#ffffff',
+                    fg: '#0f172a',
+                    headerBg: '#f8fafc',
+                    sidebarBg: '#f8fafc',
+                    footerBg: '#f8fafc',
+                    border: '#e2e8f0',
+                    hoverBg: 'rgba(15, 23, 42, 0.05)'
+                },
+                dark: {
+                    bg: '#0f172a',
+                    fg: '#f1f5f9',
+                    headerBg: '#1e293b',
+                    sidebarBg: '#1e293b',
+                    footerBg: '#1e293b',
+                    border: '#334155',
+                    hoverBg: 'rgba(241, 245, 249, 0.1)'
+                },
+                sepia: {
+                    bg: '#f4ecd8',
+                    fg: '#433422',
+                    headerBg: '#ebdcb9',
+                    sidebarBg: '#ebdcb9',
+                    footerBg: '#ebdcb9',
+                    border: '#decfa6',
+                    hoverBg: 'rgba(67, 52, 34, 0.08)'
+                },
+                cream: {
+                    bg: '#faf6ee',
+                    fg: '#2c2c2c',
+                    headerBg: '#f2eae0',
+                    sidebarBg: '#f2eae0',
+                    footerBg: '#f2eae0',
+                    border: '#e4d5c3',
+                    hoverBg: 'rgba(44, 44, 44, 0.06)'
+                },
+                olive: {
+                    bg: '#e8f5e9',
+                    fg: '#1b4332',
+                    headerBg: '#d4edda',
+                    sidebarBg: '#d4edda',
+                    footerBg: '#d4edda',
+                    border: '#c3e6cb',
+                    hoverBg: 'rgba(27, 67, 50, 0.08)'
+                }
+            };
+            
+            const theme = EPUB_THEMES[themeKey] || EPUB_THEMES.light;
+            
+            return `
+                background-color: ${theme.bg};
+                color: ${theme.fg};
+                --epub-bg: ${theme.bg};
+                --epub-fg: ${theme.fg};
+                --epub-header-bg: ${theme.headerBg};
+                --epub-sidebar-bg: ${theme.sidebarBg};
+                --epub-footer-bg: ${theme.footerBg};
+                --epub-border: ${theme.border};
+                --epub-hover-bg: ${theme.hoverBg};
             `;
         },
         changeEpubFontSize(delta) {
@@ -6193,6 +6990,7 @@ function shareApp() {
 
             this.$nextTick(async () => {
                 try {
+                    await ensurePdfLoaded();
                     const loadingTask = pdfjsLib.getDocument({ url: downloadUrl, withCredentials: true });
                     window._pdfLoadingTask = loadingTask;
                     
@@ -6289,6 +7087,12 @@ function shareApp() {
                     } else {
                         this.renderPdfPage(startPage);
                     }
+                    
+                    // Setup pinch-to-zoom gesture on the viewer area
+                    this.$nextTick(() => {
+                        const viewerArea = document.getElementById('pdf-viewer-area');
+                        if (viewerArea) this._setupPdfPinchZoom(viewerArea);
+                    });
 
                 } catch (err) {
                     console.error("PDF.js initialization failed:", err);
@@ -6453,6 +7257,129 @@ function shareApp() {
                 this.renderPdfPage(this.pdfViewer.currentPage);
             }
         },
+        togglePdfZoom(event) {
+            if (this.pdfViewer.scrollMode !== 'page') return;
+            const currentZoom = this.pdfViewer.zoom;
+            let nextZoom = 200;
+            if (currentZoom === 200 || currentZoom === '200') {
+                nextZoom = 'height';
+            }
+            this.pdfSetZoom(nextZoom);
+            
+            this.$nextTick(() => {
+                const container = document.getElementById('pdf-viewer-area');
+                if (!container) return;
+                this._setupPdfDragPan(container, nextZoom);
+            });
+        },
+        _setupPdfDragPan(container, zoomVal) {
+            container.removeEventListener('mousedown', container._pdfMouseDown);
+            container.removeEventListener('mouseleave', container._pdfMouseLeave);
+            container.removeEventListener('mouseup', container._pdfMouseUp);
+            container.removeEventListener('mousemove', container._pdfMouseMove);
+            
+            if (zoomVal !== 200 && zoomVal !== '200') {
+                container.classList.remove('cursor-grabbing');
+                container.scrollLeft = 0;
+                container.scrollTop = 0;
+                return;
+            }
+            
+            let isDown = false;
+            let startX, startY, scrollLeft, scrollTop;
+            
+            container._pdfMouseDown = (e) => {
+                isDown = true;
+                container.classList.add('cursor-grabbing');
+                startX = e.pageX - container.offsetLeft;
+                startY = e.pageY - container.offsetTop;
+                scrollLeft = container.scrollLeft;
+                scrollTop = container.scrollTop;
+            };
+            container._pdfMouseLeave = () => { isDown = false; container.classList.remove('cursor-grabbing'); };
+            container._pdfMouseUp = () => { isDown = false; container.classList.remove('cursor-grabbing'); };
+            container._pdfMouseMove = (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - container.offsetLeft;
+                const y = e.pageY - container.offsetTop;
+                container.scrollLeft = scrollLeft - (x - startX) * 1.5;
+                container.scrollTop = scrollTop - (y - startY) * 1.5;
+            };
+            
+            container.addEventListener('mousedown', container._pdfMouseDown);
+            container.addEventListener('mouseleave', container._pdfMouseLeave);
+            container.addEventListener('mouseup', container._pdfMouseUp);
+            container.addEventListener('mousemove', container._pdfMouseMove);
+        },
+        _setupPdfPinchZoom(container) {
+            if (container._pdfPinchStart) container.removeEventListener('touchstart', container._pdfPinchStart);
+            if (container._pdfPinchMove) container.removeEventListener('touchmove', container._pdfPinchMove);
+            if (container._pdfPinchEnd) container.removeEventListener('touchend', container._pdfPinchEnd);
+            
+            let initialDist = 0;
+            let initialZoom = 100;
+            let isPinching = false;
+            let touchScrollStartX = 0;
+            let touchScrollStartY = 0;
+            let scrollLeftStart = 0;
+            let scrollTopStart = 0;
+            
+            const getTouchDist = (t) => {
+                const dx = t[0].clientX - t[1].clientX;
+                const dy = t[0].clientY - t[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            };
+            
+            container._pdfPinchStart = (e) => {
+                if (this.pdfViewer.scrollMode !== 'page') return;
+                if (e.touches.length === 2) {
+                    isPinching = true;
+                    initialDist = getTouchDist(e.touches);
+                    const z = this.pdfViewer.zoom;
+                    initialZoom = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
+                    e.preventDefault();
+                } else if (e.touches.length === 1) {
+                    isPinching = false;
+                    touchScrollStartX = e.touches[0].clientX;
+                    touchScrollStartY = e.touches[0].clientY;
+                    scrollLeftStart = container.scrollLeft;
+                    scrollTopStart = container.scrollTop;
+                }
+            };
+            
+            container._pdfPinchMove = (e) => {
+                if (this.pdfViewer.scrollMode !== 'page') return;
+                if (e.touches.length === 2 && isPinching) {
+                    e.preventDefault();
+                    const dist = getTouchDist(e.touches);
+                    const ratio = dist / initialDist;
+                    const newZoom = Math.min(300, Math.max(50, Math.round(initialZoom * ratio / 25) * 25));
+                    if (newZoom !== this.pdfViewer.zoom) {
+                        this.pdfSetZoom(newZoom);
+                        this.$nextTick(() => {
+                            this._setupPdfDragPan(container, newZoom);
+                        });
+                    }
+                } else if (e.touches.length === 1 && !isPinching) {
+                    const z = this.pdfViewer.zoom;
+                    const curZoom = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
+                    if (curZoom > 100) {
+                        e.preventDefault();
+                        const dx = touchScrollStartX - e.touches[0].clientX;
+                        const dy = touchScrollStartY - e.touches[0].clientY;
+                        container.scrollLeft = scrollLeftStart + dx;
+                        container.scrollTop = scrollTopStart + dy;
+                    }
+                }
+            };
+            
+            container._pdfPinchEnd = () => { isPinching = false; };
+            
+            container.addEventListener('touchstart', container._pdfPinchStart, { passive: false });
+            container.addEventListener('touchmove', container._pdfPinchMove, { passive: false });
+            container.addEventListener('touchend', container._pdfPinchEnd);
+        },
         pdfNextPage() {
             if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
                 this.renderPdfPage(this.pdfViewer.currentPage + 1);
@@ -6474,11 +7401,26 @@ function shareApp() {
         pdfJumpToPage(page) {
             const p = parseInt(page);
             if (p >= 1 && p <= this.pdfViewer.numPages) {
-                this.renderPdfPage(p);
-                this.$nextTick(() => {
-                    const area = document.getElementById('pdf-viewer-area');
-                    if (area) area.scrollTop = 0;
-                });
+                if (this.pdfViewer.scrollMode === 'continuous') {
+                    this.pdfViewer.currentPage = p;
+                    this.$nextTick(() => {
+                        const container = document.getElementById('pdf-continuous-container') || 
+                                          document.getElementById('share-pdf-continuous-container') || 
+                                          document.getElementById('share-folder-pdf-continuous-container');
+                        if (container) {
+                            const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${p}"]`);
+                            if (wrapper) {
+                                wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }
+                    });
+                } else {
+                    this.renderPdfPage(p);
+                    this.$nextTick(() => {
+                        const area = document.getElementById('pdf-viewer-area');
+                        if (area) area.scrollTop = 0;
+                    });
+                }
             }
         },
         closePdfViewer() {
@@ -6705,7 +7647,8 @@ function shareApp() {
             const isUnsupportedMkv = (TeleCloud.isAppleDevice() && ext === 'mkv');
             this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: isMedia, mediaHtml: mediaHtml, isLarge: isLarge, isPreviewLoading: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: isUnsupportedMkv };
             if (playerTarget) {
-                setTimeout(() => {
+                setTimeout(async () => {
+                    await ensurePlayersLoaded();
                     if (this.playerInstance) this.playerInstance.destroy();
                     const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#3b82f6';
                     const streamUrl = `/s/${this.shareToken}/file/${file.id}/stream`;
@@ -6800,8 +7743,10 @@ function shareApp() {
                 this.fileInfoModal.mediaHtml = mediaHtml;
                 this.fileInfoModal.isMedia = true;
                 
-                if (ext !== 'md' && window.Prism) {
-                    setTimeout(() => Prism.highlightAllUnder(document.querySelector('#media-preview-container')), 50);
+                if (ext !== 'md') {
+                    ensurePrismLoaded().then(() => {
+                        setTimeout(() => window.Prism.highlightAllUnder(document.querySelector('#media-preview-container')), 50);
+                    });
                 }
             } catch (e) {
                 console.error("Preview failed", e);
@@ -6832,8 +7777,8 @@ function shareFileApp() {
         textPreviewHtml: '',
         imageViewer: { show: false, src: '', filename: '' },
         lightboxLoading: false,
-        comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false },
-        epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '' },
+        comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
+        epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
         pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         toastModal: { show: false, message: '', type: 'success', persistent: false },
         toastTimeout: null,
@@ -6891,6 +7836,7 @@ function shareFileApp() {
             this.comicViewer.file = file;
             this.comicViewer.pages = [];
             this.comicViewer.pageUrls = [];
+            this.comicViewer.zoomActive = false;
             
             let savedPage = 0;
             if (file && file.id) {
@@ -6906,6 +7852,18 @@ function shareFileApp() {
             this.comicViewer.scrollMode = 'page';
             this.comicViewer.loading = true;
             this.comicViewer.settingsOpen = false;
+
+            let savedDirection = 'ltr';
+            try { savedDirection = localStorage.getItem('comic-reader-direction') || 'ltr'; } catch(e) {}
+            this.comicViewer.direction = savedDirection;
+
+            let savedViewMode = 'single';
+            try { savedViewMode = localStorage.getItem('comic-reader-view-mode') || 'single'; } catch(e) {}
+            this.comicViewer.viewMode = savedViewMode;
+
+            let savedFilter = 'none';
+            try { savedFilter = localStorage.getItem('comic-reader-filter') || 'none'; } catch(e) {}
+            this.comicViewer.filter = savedFilter;
             
             const hasShareToken = !!(this.shareToken || this.token || shareToken);
             const token = this.shareToken || this.token || shareToken;
@@ -7006,18 +7964,184 @@ function shareFileApp() {
             img.src = pageUrl;
         },
         nextComicPage() {
-            if (this.comicViewer.currentPageIndex < this.comicViewer.pages.length - 1) {
-                this.comicViewer.currentPageIndex++;
+            this.comicViewer.zoomActive = false;
+            this.changeComicPageIndex(1);
+        },
+        prevComicPage() {
+            this.comicViewer.zoomActive = false;
+            this.changeComicPageIndex(-1);
+        },
+        handleComicTouchStart(e) {
+            if (this.comicViewer.zoomActive || this.comicViewer.scrollMode !== 'page') return;
+            this.comicViewer.touchStartX = e.changedTouches[0].screenX;
+            this.comicViewer.touchStartY = e.changedTouches[0].screenY;
+        },
+        handleComicTouchEnd(e) {
+            if (this.comicViewer.zoomActive || this.comicViewer.scrollMode !== 'page') return;
+            const endX = e.changedTouches[0].screenX;
+            const endY = e.changedTouches[0].screenY;
+            const diffX = endX - this.comicViewer.touchStartX;
+            const diffY = endY - this.comicViewer.touchStartY;
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                const isRTL = this.comicViewer.direction === 'rtl';
+                if (diffX > 0) {
+                    if (isRTL) this.nextComicPage();
+                    else this.prevComicPage();
+                } else {
+                    if (isRTL) this.prevComicPage();
+                    else this.nextComicPage();
+                }
+            }
+        },
+        changeComicPageIndex(logicalStep) {
+            const pagesCount = this.comicViewer.pages.length;
+            if (pagesCount <= 0) return;
+            
+            let cur = this.comicViewer.currentPageIndex;
+            let target = cur;
+            const viewMode = this.comicViewer.viewMode || 'single';
+            
+            if (viewMode === 'single') {
+                target = cur + logicalStep;
+            } else if (viewMode === 'double') {
+                if (cur % 2 !== 0) {
+                    cur = cur - 1;
+                }
+                target = cur + (logicalStep * 2);
+                if (target < 0) target = 0;
+            }
+            
+            if (target < 0) target = 0;
+            if (target >= pagesCount) {
+                if (viewMode === 'double') {
+                    target = Math.floor((pagesCount - 1) / 2) * 2;
+                } else {
+                    target = pagesCount - 1;
+                }
+            }
+            
+            if (target !== this.comicViewer.currentPageIndex) {
+                this.comicViewer.currentPageIndex = target;
                 this.loadComicPage();
-                this.preloadNextComicPage();
+                if (logicalStep > 0) {
+                    this.preloadNextComicPage();
+                }
                 this.saveComicProgress();
             }
         },
-        prevComicPage() {
-            if (this.comicViewer.currentPageIndex > 0) {
-                this.comicViewer.currentPageIndex--;
-                this.loadComicPage();
-                this.saveComicProgress();
+        getComicPagesToRender() {
+            const pagesCount = this.comicViewer.pages.length;
+            if (pagesCount <= 0) return [];
+            
+            const cur = this.comicViewer.currentPageIndex;
+            const viewMode = this.comicViewer.viewMode || 'single';
+            
+            if (viewMode === 'single' || this.comicViewer.scrollMode === 'continuous') {
+                return [cur];
+            }
+            
+            if (viewMode === 'double') {
+                let pairStart = cur;
+                if (cur % 2 !== 0) {
+                    pairStart = cur - 1;
+                }
+                const result = [pairStart];
+                if (pairStart + 1 < pagesCount) {
+                    result.push(pairStart + 1);
+                }
+                return result;
+            }
+            
+            return [cur];
+        },
+        setComicDirection(dir) {
+            this.comicViewer.direction = dir;
+            try { localStorage.setItem('comic-reader-direction', dir); } catch(e) {}
+        },
+        setComicViewMode(mode) {
+            this.comicViewer.viewMode = mode;
+            try { localStorage.setItem('comic-reader-view-mode', mode); } catch(e) {}
+            if (mode !== 'single') {
+                let cur = this.comicViewer.currentPageIndex;
+                if (mode === 'double') {
+                    if (cur % 2 !== 0) {
+                        this.comicViewer.currentPageIndex = Math.max(0, cur - 1);
+                    }
+                }
+            }
+        },
+        setComicFilter(filter) {
+            this.comicViewer.filter = filter;
+            try { localStorage.setItem('comic-reader-filter', filter); } catch(e) {}
+        },
+        getComicFilterStyle() {
+            const f = this.comicViewer.filter || 'none';
+            if (f === 'eye-care') return 'sepia(0.35) saturate(1.2) hue-rotate(-10deg)';
+            if (f === 'sepia') return 'sepia(0.85) contrast(0.95)';
+            if (f === 'contrast') return 'contrast(1.4) brightness(1.05)';
+            if (f === 'grayscale') return 'grayscale(1) contrast(1.1)';
+            return 'none';
+        },
+        toggleComicZoom(event) {
+            if (this.comicViewer.scrollMode !== 'page') return;
+            this.comicViewer.zoomActive = !this.comicViewer.zoomActive;
+            if (this.comicViewer.zoomActive) {
+                this.$nextTick(() => {
+                    const container = event.target.closest('.overflow-auto') || event.target.parentElement;
+                    if (container) {
+                        let isDown = false;
+                        let startX, startY;
+                        let scrollLeft, scrollTop;
+                        
+                        const onMouseDown = (e) => {
+                            if (!this.comicViewer.zoomActive) return;
+                            isDown = true;
+                            container.classList.add('cursor-grabbing');
+                            startX = e.pageX - container.offsetLeft;
+                            startY = e.pageY - container.offsetTop;
+                            scrollLeft = container.scrollLeft;
+                            scrollTop = container.scrollTop;
+                        };
+                        
+                        const onMouseLeaveOrUp = () => {
+                            isDown = false;
+                            container.classList.remove('cursor-grabbing');
+                        };
+                        
+                        const onMouseMove = (e) => {
+                            if (!isDown || !this.comicViewer.zoomActive) return;
+                            e.preventDefault();
+                            const x = e.pageX - container.offsetLeft;
+                            const y = e.pageY - container.offsetTop;
+                            const walkX = (x - startX) * 1.5;
+                            const walkY = (y - startY) * 1.5;
+                            container.scrollLeft = scrollLeft - walkX;
+                            container.scrollTop = scrollTop - walkY;
+                        };
+                        
+                        container.removeEventListener('mousedown', container._onMouseDown);
+                        container.removeEventListener('mouseleave', container._onMouseLeave);
+                        container.removeEventListener('mouseup', container._onMouseUp);
+                        container.removeEventListener('mousemove', container._onMouseMove);
+                        
+                        container._onMouseDown = onMouseDown;
+                        container._onMouseLeave = onMouseLeaveOrUp;
+                        container._onMouseUp = onMouseLeaveOrUp;
+                        container._onMouseMove = onMouseMove;
+                        
+                        container.addEventListener('mousedown', onMouseDown);
+                        container.addEventListener('mouseleave', onMouseLeaveOrUp);
+                        container.addEventListener('mouseup', onMouseLeaveOrUp);
+                        container.addEventListener('mousemove', onMouseMove);
+                    }
+                });
+            } else {
+                const container = event.target.closest('.overflow-auto') || event.target.parentElement;
+                if (container) {
+                    container.classList.remove('cursor-grabbing');
+                    container.scrollLeft = 0;
+                    container.scrollTop = 0;
+                }
             }
         },
         preloadNextComicPage() {
@@ -7119,6 +8243,15 @@ function shareFileApp() {
             this.epubViewer.currentChapter = 0;
             this.epubViewer.title = '';
             this.epubViewer.settingsOpen = false;
+            
+            // Restore theme & fontFamily
+            let savedTheme = 'system';
+            try { savedTheme = localStorage.getItem('epub-reader-theme') || 'system'; } catch(e) {}
+            this.epubViewer.theme = savedTheme;
+
+            let savedFontFamily = 'sans-serif';
+            try { savedFontFamily = localStorage.getItem('epub-reader-font-family') || 'sans-serif'; } catch(e) {}
+            this.epubViewer.fontFamily = savedFontFamily;
             
             const token = this.shareToken || this.token || shareToken || '';
             const hasShareToken = !!token;
@@ -7376,8 +8509,31 @@ function shareFileApp() {
             const doc = iframe.contentDocument;
             const win = iframe.contentWindow;
             const isDark = document.documentElement.classList.contains('dark');
-            const bg = isDark ? '#1e293b' : '#ffffff';
-            const fg = isDark ? '#f1f5f9' : '#0f172a';
+            
+            let themeKey = this.epubViewer.theme || 'system';
+            if (themeKey === 'system') {
+                themeKey = isDark ? 'dark' : 'light';
+            }
+            
+            const EPUB_THEMES = {
+                light: { bg: '#ffffff', fg: '#0f172a', scrollbarThumb: '#cbd5e1', scrollbarThumbHover: '#94a3b8' },
+                dark: { bg: '#0f172a', fg: '#f1f5f9', scrollbarThumb: '#475569', scrollbarThumbHover: '#64748b' },
+                sepia: { bg: '#f4ecd8', fg: '#433422', scrollbarThumb: '#cbbb97', scrollbarThumbHover: '#ab9c78' },
+                cream: { bg: '#faf6ee', fg: '#2c2c2c', scrollbarThumb: '#d5c4b1', scrollbarThumbHover: '#c5b19b' },
+                olive: { bg: '#e8f5e9', fg: '#1b4332', scrollbarThumb: '#a3cfad', scrollbarThumbHover: '#82ba8f' }
+            };
+            
+            const theme = EPUB_THEMES[themeKey] || EPUB_THEMES.light;
+            const bg = theme.bg;
+            const fg = theme.fg;
+            
+            const FONT_FAMILIES = {
+                'sans-serif': 'Inter, system-ui, -apple-system, sans-serif',
+                'serif': 'Georgia, Cambria, "Times New Roman", serif',
+                'monospace': 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                'dyslexic': '"Comic Sans MS", "Chalkboard SE", sans-serif'
+            };
+            const font = FONT_FAMILIES[this.epubViewer.fontFamily || 'sans-serif'] || FONT_FAMILIES['sans-serif'];
             
             let style = doc.getElementById('tc-epub-theme');
             if (!style) {
@@ -7386,8 +8542,8 @@ function shareFileApp() {
                 doc.head.appendChild(style);
             }
             style.textContent = `
-                body { background: ${bg} !important; color: ${fg} !important; font-size: ${this.epubViewer.fontSize}% !important; line-height: 1.6 !important; padding: 20px !important; max-width: 800px !important; margin: 0 auto !important; font-family: Inter, system-ui, -apple-system, sans-serif !important; }
-                p, span, div, li, td, th, h1, h2, h3, h4, h5, h6 { color: ${fg} !important; }
+                body { background: ${bg} !important; color: ${fg} !important; font-size: ${this.epubViewer.fontSize}% !important; line-height: 1.6 !important; padding: 20px !important; max-width: 800px !important; margin: 0 auto !important; font-family: ${font} !important; }
+                p, span, div, li, td, th, h1, h2, h3, h4, h5, h6 { color: ${fg} !important; font-family: ${font} !important; }
                 a { color: #3b82f6 !important; }
                 img, svg { max-width: 100% !important; height: auto !important; }
                 
@@ -7400,12 +8556,91 @@ function shareFileApp() {
                     background: transparent;
                 }
                 ::-webkit-scrollbar-thumb {
-                    background: ${isDark ? '#475569' : '#cbd5e1'};
+                    background: ${theme.scrollbarThumb};
                     border-radius: 4px;
                 }
                 ::-webkit-scrollbar-thumb:hover {
-                    background: ${isDark ? '#64748b' : '#94a3b8'};
+                    background: ${theme.scrollbarThumbHover};
                 }
+            `;
+        },
+        setEpubTheme(theme) {
+            this.epubViewer.theme = theme;
+            try { localStorage.setItem('epub-reader-theme', theme); } catch(e) {}
+            this.applyEpubTheme();
+        },
+        setEpubFontFamily(fontFamily) {
+            this.epubViewer.fontFamily = fontFamily;
+            try { localStorage.setItem('epub-reader-font-family', fontFamily); } catch(e) {}
+            this.applyEpubTheme();
+        },
+        getEpubThemeStyles() {
+            const isDark = document.documentElement.classList.contains('dark');
+            let themeKey = this.epubViewer.theme || 'system';
+            if (themeKey === 'system') {
+                themeKey = isDark ? 'dark' : 'light';
+            }
+            
+            const EPUB_THEMES = {
+                light: {
+                    bg: '#ffffff',
+                    fg: '#0f172a',
+                    headerBg: '#f8fafc',
+                    sidebarBg: '#f8fafc',
+                    footerBg: '#f8fafc',
+                    border: '#e2e8f0',
+                    hoverBg: 'rgba(15, 23, 42, 0.05)'
+                },
+                dark: {
+                    bg: '#0f172a',
+                    fg: '#f1f5f9',
+                    headerBg: '#1e293b',
+                    sidebarBg: '#1e293b',
+                    footerBg: '#1e293b',
+                    border: '#334155',
+                    hoverBg: 'rgba(241, 245, 249, 0.1)'
+                },
+                sepia: {
+                    bg: '#f4ecd8',
+                    fg: '#433422',
+                    headerBg: '#ebdcb9',
+                    sidebarBg: '#ebdcb9',
+                    footerBg: '#ebdcb9',
+                    border: '#decfa6',
+                    hoverBg: 'rgba(67, 52, 34, 0.08)'
+                },
+                cream: {
+                    bg: '#faf6ee',
+                    fg: '#2c2c2c',
+                    headerBg: '#f2eae0',
+                    sidebarBg: '#f2eae0',
+                    footerBg: '#f2eae0',
+                    border: '#e4d5c3',
+                    hoverBg: 'rgba(44, 44, 44, 0.06)'
+                },
+                olive: {
+                    bg: '#e8f5e9',
+                    fg: '#1b4332',
+                    headerBg: '#d4edda',
+                    sidebarBg: '#d4edda',
+                    footerBg: '#d4edda',
+                    border: '#c3e6cb',
+                    hoverBg: 'rgba(27, 67, 50, 0.08)'
+                }
+            };
+            
+            const theme = EPUB_THEMES[themeKey] || EPUB_THEMES.light;
+            
+            return `
+                background-color: ${theme.bg};
+                color: ${theme.fg};
+                --epub-bg: ${theme.bg};
+                --epub-fg: ${theme.fg};
+                --epub-header-bg: ${theme.headerBg};
+                --epub-sidebar-bg: ${theme.sidebarBg};
+                --epub-footer-bg: ${theme.footerBg};
+                --epub-border: ${theme.border};
+                --epub-hover-bg: ${theme.hoverBg};
             `;
         },
         changeEpubFontSize(delta) {
@@ -7565,6 +8800,7 @@ function shareFileApp() {
 
             this.$nextTick(async () => {
                 try {
+                    await ensurePdfLoaded();
                     const loadingTask = pdfjsLib.getDocument({ url: downloadUrl, withCredentials: true });
                     window._pdfLoadingTask = loadingTask;
                     
@@ -7661,6 +8897,12 @@ function shareFileApp() {
                     } else {
                         this.renderPdfPage(startPage);
                     }
+                    
+                    // Setup pinch-to-zoom gesture on the viewer area
+                    this.$nextTick(() => {
+                        const viewerArea = document.getElementById('pdf-viewer-area');
+                        if (viewerArea) this._setupPdfPinchZoom(viewerArea);
+                    });
 
                 } catch (err) {
                     console.error("PDF.js initialization failed:", err);
@@ -7825,6 +9067,129 @@ function shareFileApp() {
                 this.renderPdfPage(this.pdfViewer.currentPage);
             }
         },
+        togglePdfZoom(event) {
+            if (this.pdfViewer.scrollMode !== 'page') return;
+            const currentZoom = this.pdfViewer.zoom;
+            let nextZoom = 200;
+            if (currentZoom === 200 || currentZoom === '200') {
+                nextZoom = 'height';
+            }
+            this.pdfSetZoom(nextZoom);
+            
+            this.$nextTick(() => {
+                const container = document.getElementById('pdf-viewer-area');
+                if (!container) return;
+                this._setupPdfDragPan(container, nextZoom);
+            });
+        },
+        _setupPdfDragPan(container, zoomVal) {
+            container.removeEventListener('mousedown', container._pdfMouseDown);
+            container.removeEventListener('mouseleave', container._pdfMouseLeave);
+            container.removeEventListener('mouseup', container._pdfMouseUp);
+            container.removeEventListener('mousemove', container._pdfMouseMove);
+            
+            if (zoomVal !== 200 && zoomVal !== '200') {
+                container.classList.remove('cursor-grabbing');
+                container.scrollLeft = 0;
+                container.scrollTop = 0;
+                return;
+            }
+            
+            let isDown = false;
+            let startX, startY, scrollLeft, scrollTop;
+            
+            container._pdfMouseDown = (e) => {
+                isDown = true;
+                container.classList.add('cursor-grabbing');
+                startX = e.pageX - container.offsetLeft;
+                startY = e.pageY - container.offsetTop;
+                scrollLeft = container.scrollLeft;
+                scrollTop = container.scrollTop;
+            };
+            container._pdfMouseLeave = () => { isDown = false; container.classList.remove('cursor-grabbing'); };
+            container._pdfMouseUp = () => { isDown = false; container.classList.remove('cursor-grabbing'); };
+            container._pdfMouseMove = (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - container.offsetLeft;
+                const y = e.pageY - container.offsetTop;
+                container.scrollLeft = scrollLeft - (x - startX) * 1.5;
+                container.scrollTop = scrollTop - (y - startY) * 1.5;
+            };
+            
+            container.addEventListener('mousedown', container._pdfMouseDown);
+            container.addEventListener('mouseleave', container._pdfMouseLeave);
+            container.addEventListener('mouseup', container._pdfMouseUp);
+            container.addEventListener('mousemove', container._pdfMouseMove);
+        },
+        _setupPdfPinchZoom(container) {
+            if (container._pdfPinchStart) container.removeEventListener('touchstart', container._pdfPinchStart);
+            if (container._pdfPinchMove) container.removeEventListener('touchmove', container._pdfPinchMove);
+            if (container._pdfPinchEnd) container.removeEventListener('touchend', container._pdfPinchEnd);
+            
+            let initialDist = 0;
+            let initialZoom = 100;
+            let isPinching = false;
+            let touchScrollStartX = 0;
+            let touchScrollStartY = 0;
+            let scrollLeftStart = 0;
+            let scrollTopStart = 0;
+            
+            const getTouchDist = (t) => {
+                const dx = t[0].clientX - t[1].clientX;
+                const dy = t[0].clientY - t[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            };
+            
+            container._pdfPinchStart = (e) => {
+                if (this.pdfViewer.scrollMode !== 'page') return;
+                if (e.touches.length === 2) {
+                    isPinching = true;
+                    initialDist = getTouchDist(e.touches);
+                    const z = this.pdfViewer.zoom;
+                    initialZoom = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
+                    e.preventDefault();
+                } else if (e.touches.length === 1) {
+                    isPinching = false;
+                    touchScrollStartX = e.touches[0].clientX;
+                    touchScrollStartY = e.touches[0].clientY;
+                    scrollLeftStart = container.scrollLeft;
+                    scrollTopStart = container.scrollTop;
+                }
+            };
+            
+            container._pdfPinchMove = (e) => {
+                if (this.pdfViewer.scrollMode !== 'page') return;
+                if (e.touches.length === 2 && isPinching) {
+                    e.preventDefault();
+                    const dist = getTouchDist(e.touches);
+                    const ratio = dist / initialDist;
+                    const newZoom = Math.min(300, Math.max(50, Math.round(initialZoom * ratio / 25) * 25));
+                    if (newZoom !== this.pdfViewer.zoom) {
+                        this.pdfSetZoom(newZoom);
+                        this.$nextTick(() => {
+                            this._setupPdfDragPan(container, newZoom);
+                        });
+                    }
+                } else if (e.touches.length === 1 && !isPinching) {
+                    const z = this.pdfViewer.zoom;
+                    const curZoom = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
+                    if (curZoom > 100) {
+                        e.preventDefault();
+                        const dx = touchScrollStartX - e.touches[0].clientX;
+                        const dy = touchScrollStartY - e.touches[0].clientY;
+                        container.scrollLeft = scrollLeftStart + dx;
+                        container.scrollTop = scrollTopStart + dy;
+                    }
+                }
+            };
+            
+            container._pdfPinchEnd = () => { isPinching = false; };
+            
+            container.addEventListener('touchstart', container._pdfPinchStart, { passive: false });
+            container.addEventListener('touchmove', container._pdfPinchMove, { passive: false });
+            container.addEventListener('touchend', container._pdfPinchEnd);
+        },
         pdfNextPage() {
             if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
                 this.renderPdfPage(this.pdfViewer.currentPage + 1);
@@ -7846,11 +9211,26 @@ function shareFileApp() {
         pdfJumpToPage(page) {
             const p = parseInt(page);
             if (p >= 1 && p <= this.pdfViewer.numPages) {
-                this.renderPdfPage(p);
-                this.$nextTick(() => {
-                    const area = document.getElementById('pdf-viewer-area');
-                    if (area) area.scrollTop = 0;
-                });
+                if (this.pdfViewer.scrollMode === 'continuous') {
+                    this.pdfViewer.currentPage = p;
+                    this.$nextTick(() => {
+                        const container = document.getElementById('pdf-continuous-container') || 
+                                          document.getElementById('share-pdf-continuous-container') || 
+                                          document.getElementById('share-folder-pdf-continuous-container');
+                        if (container) {
+                            const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${p}"]`);
+                            if (wrapper) {
+                                wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }
+                    });
+                } else {
+                    this.renderPdfPage(p);
+                    this.$nextTick(() => {
+                        const area = document.getElementById('pdf-viewer-area');
+                        if (area) area.scrollTop = 0;
+                    });
+                }
             }
         },
         closePdfViewer() {
@@ -8115,7 +9495,11 @@ function shareFileApp() {
                                 const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                                 this.textPreviewHtml = `<div class='w-full max-h-[70vh] overflow-auto rounded-2xl bg-slate-900 text-left relative shadow-inner border border-white/5'><pre class='!m-0 !p-5 !bg-transparent !overflow-visible'><code class='${langClass} !whitespace-pre !word-break-normal'>${escaped}</code></pre></div>`;
                                 this.showTextPreviewPrompt = false;
-                                this.$nextTick(() => { if (window.Prism) Prism.highlightAllUnder(document.querySelector('#media-preview-container')); });
+                                this.$nextTick(() => {
+                                    ensurePrismLoaded().then(() => {
+                                        window.Prism.highlightAllUnder(document.querySelector('#media-preview-container'));
+                                    });
+                                });
                             })
                             .catch(err => {
                                 this.textPreviewHtml = `<div class='p-6 text-center text-red-500'><i class='fa-solid fa-circle-exclamation text-4xl mb-3'></i><p class='text-sm'>${TeleCloud.t('preview_error')}</p></div>`;
@@ -8165,7 +9549,8 @@ function shareFileApp() {
                     }
 
                     if ((videoExts.includes(ext) || audioExts.includes(ext)) && !(TeleCloud.isAppleDevice() && ext === 'mkv')) { 
-                        setTimeout(() => { 
+                        setTimeout(async () => { 
+                            await ensurePlayersLoaded();
                             if (this.playerInstance) this.playerInstance.destroy();
                             const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#3b82f6';
                             const isAudio = audioExts.includes(ext);

@@ -886,3 +886,20 @@ code[class*="language-"] {
 img.comic-img-ready {
     opacity: 1 !important;
 }
+
+/* =========================================
+   PURE TRANSLUCENT BACKGROUND UTILITIES
+   Bypasses theme Variable Bridge overrides (.bg-white/10, etc.)
+   ========================================= */
+.bg-white-pure-10 {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+.bg-white-pure-20 {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
+.hover\:bg-white-pure-10:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+.hover\:bg-white-pure-20:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
