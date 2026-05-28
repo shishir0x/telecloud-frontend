@@ -281,7 +281,6 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             error: false
         },
         uploadQueue: [],
-        tasks: {},
         backupInfo: { last_time: '', status: '', is_running: false, sqlite_only: false },
         restoreLoading: false,
         logGroupId: logGroupId,
@@ -1552,7 +1551,6 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                         }
                         task.statusText = msg || this.t(data.status);
 
-                        this.tasks[data.task_id] = task;
                         this.uploadQueue.unshift(task);
                     }
 
