@@ -5096,7 +5096,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                             const ua = navigator.userAgent;
                             const isApple = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
                             if (isApple) {
-                                Alpine.store('app').showToast(this.t('err_video_unsupported_apple'), "error");
+                                this.showToast(this.t('err_video_unsupported_apple'), "error");
                             }
                         });
                         this.playerInstance.on('fullscreen', (state) => document.body.classList.toggle('art-fullscreen-active', state));
@@ -7707,7 +7707,7 @@ function shareApp() {
                             const ua = navigator.userAgent;
                             const isApple = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
                             if (isApple) {
-                                Alpine.store('app').showToast(this.t('err_video_unsupported_apple'), "error");
+                                this.showToast(this.t('err_video_unsupported_apple'), "error");
                             }
                         });
                         this.playerInstance.on('fullscreen', (state) => document.body.classList.toggle('art-fullscreen-active', state));
@@ -9611,7 +9611,7 @@ function shareFileApp() {
                                     const ua = navigator.userAgent;
                                     const isApple = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
                                     if (isApple) {
-                                        Alpine.store('app').showToast(Alpine.store('app').t('err_video_unsupported_apple'), "error");
+                                        this.showToast(this.t('err_video_unsupported_apple'), "error");
                                     }
                                 });
                                 this.playerInstance.on('fullscreen', (state) => document.body.classList.toggle('art-fullscreen-active', state));
