@@ -816,7 +816,8 @@
                     </button>
 
                     <template x-if="fileInfoModal.file?.share_token">
-                        <div class="grid grid-cols-2 gap-2 mt-1">
+                        <div class="mt-1"
+                            :class="(!fileInfoModal.file?.is_folder && !fileInfoModal.file?.has_share_password) ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1'">
                             <button @click="copyShareLink(fileInfoModal.file, 'regular')"
                                 class="flex flex-col items-center justify-center gap-1 p-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 text-emerald-600 font-medium transition-colors text-xs">
                                 <i class="fa-solid fa-share-nodes text-base mb-0.5"></i>
