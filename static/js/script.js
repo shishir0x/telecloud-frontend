@@ -74,6 +74,11 @@ const artplayerI18n = {
         'Web Fullscreen': 'Toàn màn hình Web',
         'Mini Player': 'Trình phát thu nhỏ',
         'PIP': 'Ảnh trong ảnh',
+        'PIP Mode': 'Ảnh trong ảnh',
+        'Pip': 'Ảnh trong ảnh',
+        'Pip Mode': 'Ảnh trong ảnh',
+        'Enter PIP': 'Bật Ảnh trong ảnh',
+        'Exit PIP': 'Tắt Ảnh trong ảnh',
         'Volume': 'Âm lượng',
         'Mute': 'Tắt tiếng',
         'Reconnect': 'Kết nối lại',
@@ -81,6 +86,10 @@ const artplayerI18n = {
         'Subtitle': 'Phụ đề',
         'Video info': 'Thông tin video',
         'Close': 'Đóng',
+        'Setting': 'Cài đặt',
+        'Settings': 'Cài đặt',
+        'Show setting': 'Cài đặt',
+        'Show Setting': 'Cài đặt',
     }
 };
 
@@ -1135,6 +1144,31 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 }
             }, 15000);
         },
+        startDownloadFolder(folderId) {
+            this.isPreparingDownload = true;
+            document.cookie = "dl_started=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = `/download/folder/${folderId}`;
+            document.body.appendChild(iframe);
+            let checkCookie = setInterval(() => {
+                if (document.cookie.includes('dl_started=1')) {
+                    clearInterval(checkCookie);
+                    this.isPreparingDownload = false;
+                    this.showToast(this.t('toast_dl_started'), 'success');
+                    document.cookie = "dl_started=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                    setTimeout(() => iframe.remove(), 2000); 
+                }
+            }, 500);
+            setTimeout(() => {
+                if (this.isPreparingDownload) {
+                    clearInterval(checkCookie);
+                    this.isPreparingDownload = false;
+                    iframe.remove();
+                    this.showToast(this.t('toast_tg_timeout'), 'error');
+                }
+            }, 30000);
+        },
         async downloadSelectedBatch() {
             const fileIdsToDownload = this.selectedIds.map(Number).filter(id => {
                 const f = this.files.find(file => file.id === id);
@@ -1199,11 +1233,13 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 if (a.is_folder && !b.is_folder) return -1;
                 if (!a.is_folder && b.is_folder) return 1;
 
-                let valA, valB;
                 if (this.sortBy === 'name') {
-                    valA = a.filename.toLowerCase();
-                    valB = b.filename.toLowerCase();
-                } else if (this.sortBy === 'date') {
+                    const order = this.sortOrder === 'asc' ? 1 : -1;
+                    return a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' }) * order;
+                }
+
+                let valA, valB;
+                if (this.sortBy === 'date') {
                     valA = new Date(a.created_at).getTime() || 0;
                     valB = new Date(b.created_at).getTime() || 0;
                 } else if (this.sortBy === 'size') {
@@ -1270,6 +1306,13 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             if (this.uploadQueue.length === 0) return false;
             return this.uploadQueue.every(t => t.progress === 100 || t.isCancelled || t.hasError);
         },
+        get isOnlyFoldersSelected() {
+            if (this.selectedIds.length === 0) return false;
+            return this.selectedIds.every(id => {
+                const f = this.files.find(file => file.id === Number(id));
+                return f && f.is_folder;
+            });
+        },
         cancelUpload(taskId) {
             let task = this.uploadQueue.find(t => t.id === taskId);
             if (!task) return;
@@ -1331,6 +1374,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
         pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
+        mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false },
         modal: { show: false, type: 'alert', title: '', message: '', input: '', resolve: null, isDanger: false, inputType: 'text', applyToAll: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
         init() { 
@@ -1355,6 +1399,18 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 this.lightboxZoomed = false;
             });
 
+            this.$watch('mediaPlayerModal.minimized', value => {
+                if (!value) {
+                    this.mediaPlayerModal.x = null;
+                    this.mediaPlayerModal.y = null;
+                }
+                if (this.playerInstance) {
+                    setTimeout(() => {
+                        try { this.playerInstance.resize(); } catch(e){}
+                    }, 350);
+                }
+            });
+
             window.addEventListener('tc-render-pdf-page', (e) => {
                 if (this.pdfViewer && this.pdfViewer.show && this.pdfViewer.scrollMode === 'continuous') {
                     this.renderPdfContinuousPage(e.detail.pageNum);
@@ -1368,6 +1424,76 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
 
             window.addEventListener('online', () => this.showToast(this.t('you_are_online'), 'success'));
             window.addEventListener('offline', () => this.showToast(this.t('you_are_offline'), 'error', 0));
+
+            // Anti-Lost Floating Boundary on screen resize/rotate
+            window.addEventListener('resize', () => {
+                if (this.mediaPlayerModal.show && this.mediaPlayerModal.minimized && this.mediaPlayerModal.x !== null) {
+                    const screenWidth = window.innerWidth;
+                    const screenHeight = window.innerHeight;
+                    const playerWidth = 340; // minimum width
+                    const playerHeight = 260; // approximate height
+                    let newX = this.mediaPlayerModal.x;
+                    let newY = this.mediaPlayerModal.y;
+                    if (newX > screenWidth - playerWidth - 10) newX = screenWidth - playerWidth - 10;
+                    if (newX < 10) newX = 10;
+                    if (newY > screenHeight - playerHeight - 10) newY = screenHeight - playerHeight - 10;
+                    if (newY < 10) newY = 10;
+                    this.mediaPlayerModal.x = newX;
+                    this.mediaPlayerModal.y = newY;
+                }
+            });
+
+            // Keyboard Shortcuts for Media Player Modal
+            window.addEventListener('keydown', (e) => {
+                if (!this.mediaPlayerModal.show) return;
+                const activeEl = document.activeElement;
+                if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+                    return;
+                }
+                const key = e.key;
+                if (key === 'n' || key === 'N') {
+                    e.preventDefault();
+                    this.playNextTrack();
+                } else if (key === 'p' || key === 'P') {
+                    e.preventDefault();
+                    this.playPrevTrack();
+                }
+                if (this.mediaPlayerModal.isAudio && this.plyrInstance) {
+                    if (key === ' ' || key === 'k') {
+                        e.preventDefault();
+                        this.plyrInstance.togglePlay();
+                    } else if (key === 'ArrowLeft') {
+                        e.preventDefault();
+                        this.plyrInstance.rewind(5);
+                    } else if (key === 'ArrowRight') {
+                        e.preventDefault();
+                        this.plyrInstance.forward(5);
+                    } else if (key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.plyrInstance.volume = Math.min(1, this.plyrInstance.volume + 0.05);
+                    } else if (key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.plyrInstance.volume = Math.max(0, this.plyrInstance.volume - 0.05);
+                    }
+                } else if (!this.mediaPlayerModal.isAudio && this.playerInstance) {
+                    if (key === ' ' || key === 'k') {
+                        e.preventDefault();
+                        this.playerInstance.toggle();
+                    } else if (key === 'ArrowLeft') {
+                        e.preventDefault();
+                        this.playerInstance.backward = 5;
+                    } else if (key === 'ArrowRight') {
+                        e.preventDefault();
+                        this.playerInstance.forward = 5;
+                    } else if (key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.playerInstance.volume = Math.min(1, this.playerInstance.volume + 0.05);
+                    } else if (key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.playerInstance.volume = Math.max(0, this.playerInstance.volume - 0.05);
+                    }
+                }
+            });
 
             // Always apply theme (will be 'system' for non-logged-in users)
             TeleCloud.initTheme(this.currentTheme);
@@ -3142,6 +3268,246 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             }
             if (this.plyrInstance) { this.plyrInstance.destroy(); this.plyrInstance = null; }
             setTimeout(() => { if (!this.fileInfoModal.show) { this.fileInfoModal.isMedia = false; this.fileInfoModal.mediaHtml = ''; this.fileInfoModal.isLarge = false; this.fileInfoModal.isPreviewLoading = false; this.fileInfoModal.needsLoad = false; this.fileInfoModal.tooLarge = false; this.fileInfoModal.bypassWarning = false; this.fileInfoModal.unsupportedMedia = false; } }, 300);
+        },
+        openMediaPlayer(file) {
+            this.closeFileInfoModal();
+            const ext = file.filename.split('.').pop().toLowerCase();
+            const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'ogv', '3gp', 'flv', 'wmv'];
+            const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus', 'oga', 'aac', 'm4b'];
+            const isAudio = audioExts.includes(ext);
+            const streamUrl = `/api/files/${file.id}/stream`;
+            const thumbUrl = `/api/files/${file.id}/thumb`;
+            
+            this.mediaPlayerModal = {
+                show: true,
+                file: file,
+                isAudio: isAudio,
+                isPlaying: false,
+                minimized: false,
+                x: null,
+                y: null,
+                playlist: [],
+                playlistIndex: -1,
+                playlistOpen: false
+            };
+            this.initPlaylist(file);
+            
+            setTimeout(async () => {
+                await ensurePlayersLoaded();
+                if (this.playerInstance) { try { this.playerInstance.destroy(); } catch(e){} this.playerInstance = null; }
+                if (this.plyrInstance) { try { this.plyrInstance.destroy(); } catch(e){} this.plyrInstance = null; }
+                
+                // Network connection cleanup for previous audio
+                const oldAudioEl = document.getElementById('cinema-audio-player');
+                if (oldAudioEl) {
+                    try {
+                        oldAudioEl.pause();
+                        oldAudioEl.innerHTML = '';
+                        oldAudioEl.load();
+                    } catch(e){}
+                }
+                
+                const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#3b82f6';
+                
+                if (isAudio) {
+                    const plyrOpts = { controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'settings'], settings: ['speed'], speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] } };
+                    const audioEl = document.getElementById('cinema-audio-player');
+                    if (audioEl) {
+                        audioEl.innerHTML = `<source src="${streamUrl}" type="${audioExts.includes(ext) ? 'audio/' + (ext === 'mp3' ? 'mpeg' : ext) : 'audio/mpeg'}">`;
+                        this.plyrInstance = new Plyr(audioEl, plyrOpts);
+                        this.plyrInstance.on('play', () => { this.mediaPlayerModal.isPlaying = true; });
+                        this.plyrInstance.on('pause', () => { this.mediaPlayerModal.isPlaying = false; });
+                        this.plyrInstance.on('ended', () => { this.playNextTrack(); });
+                        setTimeout(() => {
+                            try {
+                                const p = this.plyrInstance.play();
+                                if (p && typeof p.catch === 'function') p.catch(() => {});
+                            } catch(e) {
+                                try {
+                                    const p = audioEl.play();
+                                    if (p && typeof p.catch === 'function') p.catch(() => {});
+                                } catch(err){}
+                            }
+                        }, 100);
+                    }
+                } else {
+                    const matchedSubs = findSubtitlesForVideo(file.filename, this.files || [], false, '');
+                    this.playerInstance = new Artplayer({
+                        logger: false,
+                        container: '#cinema-video-player',
+                        lang: this.lang === 'vi' ? 'vi' : 'en',
+                        i18n: artplayerI18n,
+                        url: streamUrl,
+                        poster: thumbUrl,
+                        title: file.filename,
+                        theme: accentColor,
+                        fullscreen: true,
+                        fullscreenWeb: true,
+                        pip: true,
+                        setting: true,
+                        playbackRate: true,
+                        aspectRatio: true,
+                        autoSize: false,
+                        autoMini: true,
+                        playsInline: true,
+                        lock: true,
+                        fastForward: true,
+                        autoplay: true,
+                        airplay: true,
+                        type: ext === 'mkv' ? 'mp4' : ext,
+                        moreVideoAttr: {
+                            'playsinline': true,
+                            'webkit-playsinline': true,
+                            'x5-video-player-type': 'h5-page',
+                        },
+                        subtitle: {
+                            url: matchedSubs.length > 0 ? matchedSubs[0].url : '',
+                            type: matchedSubs.length > 0 ? matchedSubs[0].type : 'vtt',
+                            style: {
+                                color: '#ffffff',
+                                fontSize: '20px',
+                                textShadow: '0 0 4px #000, 0 0 4px #000',
+                            },
+                            escape: false,
+                        },
+                        settings: [
+                            buildArtplayerSubtitleSetting(file.filename, this.files || [], false, '', (k) => this.t(k))
+                        ],
+                        icons: {
+                            loading: '<div class="premium-loader mx-auto"></div>',
+                            state: '<svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" style="transform: translateX(2px);"><path d="M8 5v14l11-7z"/></svg>',
+                            play: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+                            pause: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
+                        }
+                    });
+                    this.playerInstance.on('ready', () => {
+                        try { this.playerInstance.play(); } catch(e){}
+                    });
+                    this.playerInstance.on('video:ended', () => { this.playNextTrack(); });
+                    this.playerInstance.on('error', (error, reconnectTime) => {
+                        const ua = navigator.userAgent;
+                        const isApple = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
+                        if (isApple) {
+                            this.showToast(this.t('err_video_unsupported_apple'), "error");
+                        }
+                    });
+                    this.playerInstance.on('fullscreen', (state) => document.body.classList.toggle('art-fullscreen-active', state));
+                    this.playerInstance.on('fullscreenWeb', (state) => document.body.classList.toggle('art-fullscreen-active', state));
+                }
+            }, 50);
+        },
+        closeMediaPlayerModal() {
+            this.mediaPlayerModal.show = false;
+            this.mediaPlayerModal.isPlaying = false;
+            if (this.playerInstance) {
+                try { this.playerInstance.destroy(); } catch(e){}
+                this.playerInstance = null;
+            }
+            if (this.plyrInstance) {
+                try { this.plyrInstance.destroy(); } catch(e){}
+                this.plyrInstance = null;
+            }
+            setTimeout(() => {
+                if (!this.mediaPlayerModal.show) {
+                    this.mediaPlayerModal.minimized = false;
+                    this.mediaPlayerModal.x = null;
+                    this.mediaPlayerModal.y = null;
+                    this.mediaPlayerModal.file = null;
+                }
+            }, 300);
+        },
+        startDrag(e) {
+            if (!this.mediaPlayerModal.minimized) return;
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('audio') || e.target.closest('video')) {
+                return;
+            }
+            e.preventDefault();
+            const modalEl = e.currentTarget.closest('.fixed');
+            if (!modalEl) return;
+            const rect = modalEl.getBoundingClientRect();
+            if (this.mediaPlayerModal.x === null) {
+                this.mediaPlayerModal.x = rect.left;
+                this.mediaPlayerModal.y = rect.top;
+            }
+            const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+            const dragStartX = clientX;
+            const dragStartY = clientY;
+            const playerStartX = this.mediaPlayerModal.x;
+            const playerStartY = this.mediaPlayerModal.y;
+            const onDrag = (moveEvent) => {
+                const curX = moveEvent.type.startsWith('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
+                const curY = moveEvent.type.startsWith('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
+                const deltaX = curX - dragStartX;
+                const deltaY = curY - dragStartY;
+                let newX = playerStartX + deltaX;
+                let newY = playerStartY + deltaY;
+                const screenWidth = window.innerWidth;
+                const screenHeight = window.innerHeight;
+                const playerWidth = rect.width;
+                const playerHeight = rect.height;
+                if (newX < 10) newX = 10;
+                if (newX > screenWidth - playerWidth - 10) newX = screenWidth - playerWidth - 10;
+                if (newY < 10) newY = 10;
+                if (newY > screenHeight - playerHeight - 10) newY = screenHeight - playerHeight - 10;
+                this.mediaPlayerModal.x = newX;
+                this.mediaPlayerModal.y = newY;
+            };
+            const onDragEnd = () => {
+                document.removeEventListener('mousemove', onDrag);
+                document.removeEventListener('mouseup', onDragEnd);
+                document.removeEventListener('touchmove', onDrag);
+                document.removeEventListener('touchend', onDragEnd);
+            };
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', onDragEnd);
+            document.addEventListener('touchmove', onDrag, { passive: false });
+            document.addEventListener('touchend', onDragEnd);
+        },
+        initPlaylist(currentFile) {
+            const ext = currentFile.filename.split('.').pop().toLowerCase();
+            const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'ogv', '3gp', 'flv', 'wmv'];
+            const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus', 'oga', 'aac', 'm4b'];
+            const allFiles = this.filteredFiles || [];
+            this.mediaPlayerModal.playlist = allFiles.filter(f => {
+                const fExt = f.filename.split('.').pop().toLowerCase();
+                return videoExts.includes(fExt) || audioExts.includes(fExt);
+            });
+            this.mediaPlayerModal.playlistIndex = this.mediaPlayerModal.playlist.findIndex(f => String(f.id) === String(currentFile.id));
+        },
+        playTrackByIndex(index) {
+            if (index < 0 || index >= this.mediaPlayerModal.playlist.length) return;
+            const file = this.mediaPlayerModal.playlist[index];
+            const minimized = this.mediaPlayerModal.minimized;
+            const playlist = this.mediaPlayerModal.playlist;
+            const playlistOpen = this.mediaPlayerModal.playlistOpen;
+            const x = this.mediaPlayerModal.x;
+            const y = this.mediaPlayerModal.y;
+            
+            this.openMediaPlayer(file);
+            
+            this.mediaPlayerModal.minimized = minimized;
+            this.mediaPlayerModal.playlist = playlist;
+            this.mediaPlayerModal.playlistIndex = index;
+            this.mediaPlayerModal.playlistOpen = playlistOpen;
+            this.mediaPlayerModal.x = x;
+            this.mediaPlayerModal.y = y;
+        },
+        playNextTrack() {
+            if (this.mediaPlayerModal.playlist.length === 0) return;
+            let nextIndex = this.mediaPlayerModal.playlistIndex + 1;
+            if (nextIndex >= this.mediaPlayerModal.playlist.length) {
+                nextIndex = 0;
+            }
+            this.playTrackByIndex(nextIndex);
+        },
+        playPrevTrack() {
+            if (this.mediaPlayerModal.playlist.length === 0) return;
+            let prevIndex = this.mediaPlayerModal.playlistIndex - 1;
+            if (prevIndex < 0) {
+                prevIndex = this.mediaPlayerModal.playlist.length - 1;
+            }
+            this.playTrackByIndex(prevIndex);
         },
         openImageViewer(src, filename, file = null) {
             if (this.imageViewer.src === src && this.imageViewer.filename === filename) {
@@ -5019,9 +5385,6 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             if (mediaHtml) {
                 isMedia = true;
                 isLarge = true; // Make media modals larger by default
-                if ((videoExts.includes(ext) || audioExts.includes(ext)) && !(TeleCloud.isAppleDevice() && ext === 'mkv')) {
-                    playerTarget = { el: '#index-tele-player', type: videoExts.includes(ext) ? 'video' : 'audio' };
-                }
             } else if (textExts.includes(ext)) {
                 this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: false, mediaHtml: '', isLarge: true, isPreviewLoading: false, needsLoad: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: false };
                 
@@ -5035,75 +5398,6 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             
             const isUnsupportedMkv = (TeleCloud.isAppleDevice() && ext === 'mkv');
             this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: isMedia, mediaHtml: mediaHtml, isLarge: isLarge, isPreviewLoading: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: isUnsupportedMkv };
-            if (playerTarget) {
-                setTimeout(async () => {
-                    await ensurePlayersLoaded();
-                    if (this.playerInstance) this.playerInstance.destroy();
-                    const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#3b82f6';
-                    
-                    if (playerTarget.type === 'audio') {
-                        const plyrOpts = { controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'settings'], settings: ['speed'], speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] } };
-                        this.playerInstance = new Plyr(playerTarget.el, plyrOpts);
-                    } else {
-                        const matchedSubs = findSubtitlesForVideo(file.filename, this.files || [], false, '');
-                        this.playerInstance = new Artplayer({
-                            logger: false,
-                            container: playerTarget.el,
-                            lang: this.lang === 'vi' ? 'vi' : 'en',
-                            i18n: artplayerI18n,
-                            url: streamUrl,
-                            poster: thumbUrl,
-                            title: file.filename,
-                            theme: accentColor,
-                            fullscreen: true,
-                            fullscreenWeb: true,
-                            pip: true,
-                            setting: true,
-                            playbackRate: true,
-                            aspectRatio: true,
-                            autoSize: false,
-                            autoMini: true,
-                            playsInline: true,
-                            lock: true,
-                            fastForward: true,
-                            autoPlayback: true,
-                            airplay: true,
-                            type: file.filename.split('.').pop().toLowerCase() === 'mkv' ? 'mp4' : file.filename.split('.').pop().toLowerCase(),
-                            moreVideoAttr: {
-                                'playsinline': true,
-                                'webkit-playsinline': true,
-                                'x5-video-player-type': 'h5-page',
-                            },
-                            subtitle: {
-                                url: matchedSubs.length > 0 ? matchedSubs[0].url : '',
-                                type: matchedSubs.length > 0 ? matchedSubs[0].type : 'vtt',
-                                style: {
-                                    color: '#ffffff',
-                                    fontSize: '20px',
-                                    textShadow: '0 0 4px #000, 0 0 4px #000',
-                                },
-                                escape: false,
-                            },
-                            settings: [
-                                buildArtplayerSubtitleSetting(file.filename, this.files || [], false, '', (k) => this.t(k))
-                            ],
-                            icons: {
-                                loading: '<i class="fa-solid fa-spinner fa-spin text-4xl"></i>',
-                                state: '<i class="fa-solid fa-play text-4xl"></i>',
-                            }
-                        });
-                        this.playerInstance.on('error', (error, reconnectTime) => {
-                            const ua = navigator.userAgent;
-                            const isApple = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
-                            if (isApple) {
-                                this.showToast(this.t('err_video_unsupported_apple'), "error");
-                            }
-                        });
-                        this.playerInstance.on('fullscreen', (state) => document.body.classList.toggle('art-fullscreen-active', state));
-                        this.playerInstance.on('fullscreenWeb', (state) => document.body.classList.toggle('art-fullscreen-active', state));
-                    }
-                }, 50);
-            }
         },
         async loadFilePreview() {
             this.fileInfoModal.needsLoad = false;
@@ -5474,6 +5768,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
 function shareApp() {
     return {
         shareToken: '',
+        showPrivacyModal: false,
         currentTheme: localStorage.getItem('theme') || 'system',
         currentTab: 'files',
         viewMode: localStorage.getItem('viewMode') || 'list',
@@ -5536,6 +5831,7 @@ function shareApp() {
                 }
             }, 15000);
         },
+
 
         async downloadSelectedBatch() {
             const fileIdsToDownload = this.selectedIds.map(Number).filter(id => {
@@ -5602,11 +5898,13 @@ function shareApp() {
                 if (a.is_folder && !b.is_folder) return -1;
                 if (!a.is_folder && b.is_folder) return 1;
 
-                let valA, valB;
                 if (this.sortBy === 'name') {
-                    valA = a.filename.toLowerCase();
-                    valB = b.filename.toLowerCase();
-                } else if (this.sortBy === 'date') {
+                    const order = this.sortOrder === 'asc' ? 1 : -1;
+                    return a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' }) * order;
+                }
+
+                let valA, valB;
+                if (this.sortBy === 'date') {
                     valA = new Date(a.created_at).getTime() || 0;
                     valB = new Date(b.created_at).getTime() || 0;
                 } else if (this.sortBy === 'size') {
@@ -5634,6 +5932,13 @@ function shareApp() {
             const start = (this.currentPage - 1) * this.itemsPerPage;
             const end = start + this.itemsPerPage;
             return this.filteredFiles.slice(start, end);
+        },
+        get isOnlyFoldersSelected() {
+            if (this.selectedIds.length === 0) return false;
+            return this.selectedIds.every(id => {
+                const f = this.files.find(file => file.id === Number(id));
+                return f && f.is_folder;
+            });
         },
         currentPath: '/', 
         openMenuId: null,
@@ -5671,6 +5976,7 @@ function shareApp() {
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
         pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
+        mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
         
         init() { 
@@ -5695,6 +6001,18 @@ function shareApp() {
                 this.lightboxZoomed = false;
             });
 
+            this.$watch('mediaPlayerModal.minimized', value => {
+                if (!value) {
+                    this.mediaPlayerModal.x = null;
+                    this.mediaPlayerModal.y = null;
+                }
+                if (this.playerInstance) {
+                    setTimeout(() => {
+                        try { this.playerInstance.resize(); } catch(e){}
+                    }, 350);
+                }
+            });
+
             this.shareToken = this.$refs.token ? this.$refs.token.textContent.trim() : '';
             window.addEventListener('tc-render-pdf-page', (e) => {
                 if (this.pdfViewer && this.pdfViewer.show && this.pdfViewer.scrollMode === 'continuous') {
@@ -5709,6 +6027,76 @@ function shareApp() {
 
             window.addEventListener('online', () => this.showToast(this.t('you_are_online'), 'success'));
             window.addEventListener('offline', () => this.showToast(this.t('you_are_offline'), 'error', 0));
+
+            // Anti-Lost Floating Boundary on screen resize/rotate
+            window.addEventListener('resize', () => {
+                if (this.mediaPlayerModal.show && this.mediaPlayerModal.minimized && this.mediaPlayerModal.x !== null) {
+                    const screenWidth = window.innerWidth;
+                    const screenHeight = window.innerHeight;
+                    const playerWidth = 340; // minimum width
+                    const playerHeight = 260; // approximate height
+                    let newX = this.mediaPlayerModal.x;
+                    let newY = this.mediaPlayerModal.y;
+                    if (newX > screenWidth - playerWidth - 10) newX = screenWidth - playerWidth - 10;
+                    if (newX < 10) newX = 10;
+                    if (newY > screenHeight - playerHeight - 10) newY = screenHeight - playerHeight - 10;
+                    if (newY < 10) newY = 10;
+                    this.mediaPlayerModal.x = newX;
+                    this.mediaPlayerModal.y = newY;
+                }
+            });
+
+            // Keyboard Shortcuts for Media Player Modal
+            window.addEventListener('keydown', (e) => {
+                if (!this.mediaPlayerModal.show) return;
+                const activeEl = document.activeElement;
+                if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+                    return;
+                }
+                const key = e.key;
+                if (key === 'n' || key === 'N') {
+                    e.preventDefault();
+                    this.playNextTrack();
+                } else if (key === 'p' || key === 'P') {
+                    e.preventDefault();
+                    this.playPrevTrack();
+                }
+                if (this.mediaPlayerModal.isAudio && this.plyrInstance) {
+                    if (key === ' ' || key === 'k') {
+                        e.preventDefault();
+                        this.plyrInstance.togglePlay();
+                    } else if (key === 'ArrowLeft') {
+                        e.preventDefault();
+                        this.plyrInstance.rewind(5);
+                    } else if (key === 'ArrowRight') {
+                        e.preventDefault();
+                        this.plyrInstance.forward(5);
+                    } else if (key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.plyrInstance.volume = Math.min(1, this.plyrInstance.volume + 0.05);
+                    } else if (key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.plyrInstance.volume = Math.max(0, this.plyrInstance.volume - 0.05);
+                    }
+                } else if (!this.mediaPlayerModal.isAudio && this.playerInstance) {
+                    if (key === ' ' || key === 'k') {
+                        e.preventDefault();
+                        this.playerInstance.toggle();
+                    } else if (key === 'ArrowLeft') {
+                        e.preventDefault();
+                        this.playerInstance.backward = 5;
+                    } else if (key === 'ArrowRight') {
+                        e.preventDefault();
+                        this.playerInstance.forward = 5;
+                    } else if (key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.playerInstance.volume = Math.min(1, this.playerInstance.volume + 0.05);
+                    } else if (key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.playerInstance.volume = Math.max(0, this.playerInstance.volume - 0.05);
+                    }
+                }
+            });
 
             TeleCloud.initTheme('system');
 
@@ -5727,7 +6115,7 @@ function shareApp() {
             });
         },
         openContextMenu(e, file) {
-            if (!file) return; 
+            if (!file || file.is_folder) return; 
             this.contextMenu.file = file;
             let x = e.clientX; let y = e.clientY;
             if (window.innerWidth - x < 210) x = window.innerWidth - 210;
@@ -5771,6 +6159,254 @@ function shareApp() {
             }
             if (this.plyrInstance) { this.plyrInstance.destroy(); this.plyrInstance = null; }
             setTimeout(() => { if (!this.fileInfoModal.show) { this.fileInfoModal.isMedia = false; this.fileInfoModal.mediaHtml = ''; this.fileInfoModal.isLarge = false; this.fileInfoModal.isPreviewLoading = false; this.fileInfoModal.needsLoad = false; this.fileInfoModal.tooLarge = false; this.fileInfoModal.bypassWarning = false; this.fileInfoModal.unsupportedMedia = false; } }, 300);
+        },
+        openMediaPlayer(file) {
+            this.closeFileInfoModal();
+            const ext = file.filename.split('.').pop().toLowerCase();
+            const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'ogv', '3gp', 'flv', 'wmv'];
+            const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus', 'oga', 'aac', 'm4b'];
+            const isAudio = audioExts.includes(ext);
+            const streamUrl = `/s/${this.shareToken}/file/${file.id}/stream`;
+            const thumbUrl = `/s/${this.shareToken}/file/${file.id}/thumb`;
+            
+            this.mediaPlayerModal = {
+                show: true,
+                file: file,
+                isAudio: isAudio,
+                isPlaying: false,
+                minimized: false,
+                x: null,
+                y: null,
+                playlist: [],
+                playlistIndex: -1,
+                playlistOpen: false
+            };
+            this.initPlaylist(file);
+            
+            setTimeout(async () => {
+                await ensurePlayersLoaded();
+                if (this.playerInstance) { try { this.playerInstance.destroy(); } catch(e){} this.playerInstance = null; }
+                if (this.plyrInstance) { try { this.plyrInstance.destroy(); } catch(e){} this.plyrInstance = null; }
+                
+                // Network connection cleanup for previous audio
+                const oldAudioEl = document.getElementById('cinema-audio-player');
+                if (oldAudioEl) {
+                    try {
+                        oldAudioEl.pause();
+                        oldAudioEl.innerHTML = '';
+                        oldAudioEl.load();
+                    } catch(e){}
+                }
+                
+                const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#3b82f6';
+                
+                if (isAudio) {
+                    const plyrOpts = { controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'settings'], settings: ['speed'], speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] } };
+                    const audioEl = document.getElementById('cinema-audio-player');
+                    if (audioEl) {
+                        audioEl.innerHTML = `<source src="${streamUrl}" type="${audioExts.includes(ext) ? 'audio/' + (ext === 'mp3' ? 'mpeg' : ext) : 'audio/mpeg'}">`;
+                        this.plyrInstance = new Plyr(audioEl, plyrOpts);
+                        this.plyrInstance.on('play', () => { this.mediaPlayerModal.isPlaying = true; });
+                        this.plyrInstance.on('pause', () => { this.mediaPlayerModal.isPlaying = false; });
+                        this.plyrInstance.on('ended', () => { this.playNextTrack(); });
+                        setTimeout(() => {
+                            try {
+                                const p = this.plyrInstance.play();
+                                if (p && typeof p.catch === 'function') p.catch(() => {});
+                            } catch(e) {
+                                try {
+                                    const p = audioEl.play();
+                                    if (p && typeof p.catch === 'function') p.catch(() => {});
+                                } catch(err){}
+                            }
+                        }, 100);
+                    }
+                } else {
+                    const matchedSubs = findSubtitlesForVideo(file.filename, this.files || [], true, this.shareToken);
+                    this.playerInstance = new Artplayer({
+                        logger: false,
+                        container: '#cinema-video-player',
+                        lang: this.lang === 'vi' ? 'vi' : 'en',
+                        i18n: artplayerI18n,
+                        url: streamUrl,
+                        poster: thumbUrl,
+                        title: file.filename,
+                        theme: accentColor,
+                        fullscreen: true,
+                        fullscreenWeb: true,
+                        pip: true,
+                        setting: true,
+                        playbackRate: true,
+                        aspectRatio: true,
+                        autoSize: false,
+                        autoMini: true,
+                        playsInline: true,
+                        lock: true,
+                        fastForward: true,
+                        autoplay: true,
+                        airplay: true,
+                        type: ext === 'mkv' ? 'mp4' : ext,
+                        moreVideoAttr: {
+                            'playsinline': true,
+                            'webkit-playsinline': true,
+                            'x5-video-player-type': 'h5-page',
+                        },
+                        subtitle: {
+                            url: matchedSubs.length > 0 ? matchedSubs[0].url : '',
+                            type: matchedSubs.length > 0 ? matchedSubs[0].type : 'vtt',
+                            style: {
+                                color: '#ffffff',
+                                fontSize: '20px',
+                                textShadow: '0 0 4px #000, 0 0 4px #000',
+                            },
+                            escape: false,
+                        },
+                        settings: [
+                            buildArtplayerSubtitleSetting(file.filename, this.files || true, this.shareToken, (k) => this.t(k))
+                        ],
+                        icons: {
+                            loading: '<div class="premium-loader mx-auto"></div>',
+                            state: '<svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" style="transform: translateX(2px);"><path d="M8 5v14l11-7z"/></svg>',
+                            play: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+                            pause: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
+                        }
+                    });
+                    this.playerInstance.on('ready', () => {
+                        try { this.playerInstance.play(); } catch(e){}
+                    });
+                    this.playerInstance.on('video:ended', () => { this.playNextTrack(); });
+                    this.playerInstance.on('error', (error, reconnectTime) => {
+                        const ua = navigator.userAgent;
+                        const isApple = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
+                        if (isApple) {
+                            this.showToast(this.t('err_video_unsupported_apple'), "error");
+                        }
+                    });
+                    this.playerInstance.on('fullscreen', (state) => document.body.classList.toggle('art-fullscreen-active', state));
+                    this.playerInstance.on('fullscreenWeb', (state) => document.body.classList.toggle('art-fullscreen-active', state));
+                }
+            }, 50);
+        },
+        closeMediaPlayerModal() {
+            this.mediaPlayerModal.show = false;
+            this.mediaPlayerModal.isPlaying = false;
+            if (this.playerInstance) {
+                try { this.playerInstance.destroy(); } catch(e){}
+                this.playerInstance = null;
+            }
+            if (this.plyrInstance) {
+                try { this.plyrInstance.destroy(); } catch(e){}
+                this.plyrInstance = null;
+            }
+            const audioEl = document.getElementById('cinema-audio-player');
+            if (audioEl) {
+                try {
+                    audioEl.pause();
+                    audioEl.innerHTML = '';
+                    audioEl.load();
+                } catch(e){}
+            }
+            setTimeout(() => {
+                if (!this.mediaPlayerModal.show) {
+                    this.mediaPlayerModal.minimized = false;
+                    this.mediaPlayerModal.x = null;
+                    this.mediaPlayerModal.y = null;
+                    this.mediaPlayerModal.file = null;
+                }
+            }, 300);
+        },
+        startDrag(e) {
+            if (!this.mediaPlayerModal.minimized) return;
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('audio') || e.target.closest('video')) {
+                return;
+            }
+            e.preventDefault();
+            const modalEl = e.currentTarget.closest('.fixed');
+            if (!modalEl) return;
+            const rect = modalEl.getBoundingClientRect();
+            if (this.mediaPlayerModal.x === null) {
+                this.mediaPlayerModal.x = rect.left;
+                this.mediaPlayerModal.y = rect.top;
+            }
+            const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+            const dragStartX = clientX;
+            const dragStartY = clientY;
+            const playerStartX = this.mediaPlayerModal.x;
+            const playerStartY = this.mediaPlayerModal.y;
+            const onDrag = (moveEvent) => {
+                const curX = moveEvent.type.startsWith('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
+                const curY = moveEvent.type.startsWith('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
+                const deltaX = curX - dragStartX;
+                const deltaY = curY - dragStartY;
+                let newX = playerStartX + deltaX;
+                let newY = playerStartY + deltaY;
+                const screenWidth = window.innerWidth;
+                const screenHeight = window.innerHeight;
+                const playerWidth = rect.width;
+                const playerHeight = rect.height;
+                if (newX < 10) newX = 10;
+                if (newX > screenWidth - playerWidth - 10) newX = screenWidth - playerWidth - 10;
+                if (newY < 10) newY = 10;
+                if (newY > screenHeight - playerHeight - 10) newY = screenHeight - playerHeight - 10;
+                this.mediaPlayerModal.x = newX;
+                this.mediaPlayerModal.y = newY;
+            };
+            const onDragEnd = () => {
+                document.removeEventListener('mousemove', onDrag);
+                document.removeEventListener('mouseup', onDragEnd);
+                document.removeEventListener('touchmove', onDrag);
+                document.removeEventListener('touchend', onDragEnd);
+            };
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', onDragEnd);
+            document.addEventListener('touchmove', onDrag, { passive: false });
+            document.addEventListener('touchend', onDragEnd);
+        },
+        initPlaylist(currentFile) {
+            const ext = currentFile.filename.split('.').pop().toLowerCase();
+            const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'ogv', '3gp', 'flv', 'wmv'];
+            const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus', 'oga', 'aac', 'm4b'];
+            const allFiles = this.filteredFiles || [];
+            this.mediaPlayerModal.playlist = allFiles.filter(f => {
+                const fExt = f.filename.split('.').pop().toLowerCase();
+                return videoExts.includes(fExt) || audioExts.includes(fExt);
+            });
+            this.mediaPlayerModal.playlistIndex = this.mediaPlayerModal.playlist.findIndex(f => String(f.id) === String(currentFile.id));
+        },
+        playTrackByIndex(index) {
+            if (index < 0 || index >= this.mediaPlayerModal.playlist.length) return;
+            const file = this.mediaPlayerModal.playlist[index];
+            const minimized = this.mediaPlayerModal.minimized;
+            const playlist = this.mediaPlayerModal.playlist;
+            const playlistOpen = this.mediaPlayerModal.playlistOpen;
+            const x = this.mediaPlayerModal.x;
+            const y = this.mediaPlayerModal.y;
+            
+            this.openMediaPlayer(file);
+            
+            this.mediaPlayerModal.minimized = minimized;
+            this.mediaPlayerModal.playlist = playlist;
+            this.mediaPlayerModal.playlistIndex = index;
+            this.mediaPlayerModal.playlistOpen = playlistOpen;
+            this.mediaPlayerModal.x = x;
+            this.mediaPlayerModal.y = y;
+        },
+        playNextTrack() {
+            if (this.mediaPlayerModal.playlist.length === 0) return;
+            let nextIndex = this.mediaPlayerModal.playlistIndex + 1;
+            if (nextIndex >= this.mediaPlayerModal.playlist.length) {
+                nextIndex = 0;
+            }
+            this.playTrackByIndex(nextIndex);
+        },
+        playPrevTrack() {
+            if (this.mediaPlayerModal.playlist.length === 0) return;
+            let prevIndex = this.mediaPlayerModal.playlistIndex - 1;
+            if (prevIndex < 0) {
+                prevIndex = this.mediaPlayerModal.playlist.length - 1;
+            }
+            this.playTrackByIndex(prevIndex);
         },
         openImageViewer(src, filename, file = null) {
             if (this.imageViewer.src === src && this.imageViewer.filename === filename) {
@@ -7621,16 +8257,13 @@ function shareApp() {
                 'flac': 'audio/flac', 'm4a': 'audio/mp4', 'opus': 'audio/ogg', 'oga': 'audio/ogg',
                 'aac': 'audio/aac', 'm4b': 'audio/mp4'
             };
-            let isMedia = false; let mediaHtml = ''; let playerTarget = null;
+            let isMedia = false;
+            let mediaHtml = '';
             let isLarge = false;
-            
             mediaHtml = TeleCloud.getMediaHtml(file, { isShare: true, shareToken: this.shareToken });
             if (mediaHtml) {
                 isMedia = true;
                 isLarge = true; // Make media modals larger by default
-                if ((videoExts.includes(ext) || audioExts.includes(ext)) && !(TeleCloud.isAppleDevice() && ext === 'mkv')) {
-                    playerTarget = { el: '#tele-player', type: videoExts.includes(ext) ? 'video' : 'audio' };
-                }
             } else if (textExts.includes(ext)) {
                 this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: false, mediaHtml: '', isLarge: true, isPreviewLoading: false, needsLoad: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: false };
                 
@@ -7644,77 +8277,6 @@ function shareApp() {
             
             const isUnsupportedMkv = (TeleCloud.isAppleDevice() && ext === 'mkv');
             this.fileInfoModal = { show: true, file: file, typeName: typeData.n, ext: typeData.ext || '', svgIcon: typeData.i, bgColor: typeData.c, isMedia: isMedia, mediaHtml: mediaHtml, isLarge: isLarge, isPreviewLoading: false, tooLarge: isTooLarge, bypassWarning: false, unsupportedMedia: isUnsupportedMkv };
-            if (playerTarget) {
-                setTimeout(async () => {
-                    await ensurePlayersLoaded();
-                    if (this.playerInstance) this.playerInstance.destroy();
-                    const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim() || '#3b82f6';
-                    const streamUrl = `/s/${this.shareToken}/file/${file.id}/stream`;
-                    const thumbUrl = `/s/${this.shareToken}/file/${file.id}/thumb`;
-
-                    if (playerTarget.type === 'audio') {
-                        const plyrOpts = { controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'settings'], settings: ['speed'], speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] } };
-                        this.playerInstance = new Plyr(playerTarget.el, plyrOpts);
-                    } else {
-                        const matchedSubs = findSubtitlesForVideo(file.filename, this.files || [], true, this.shareToken);
-                        this.playerInstance = new Artplayer({
-                            logger: false,
-                            container: playerTarget.el,
-                            lang: this.lang === 'vi' ? 'vi' : 'en',
-                            i18n: artplayerI18n,
-                            url: streamUrl,
-                            poster: thumbUrl,
-                            title: file.filename,
-                            theme: accentColor,
-                            fullscreen: true,
-                            fullscreenWeb: true,
-                            pip: true,
-                            setting: true,
-                            playbackRate: true,
-                            aspectRatio: true,
-                            autoSize: false,
-                            autoMini: true,
-                            playsInline: true,
-                            lock: true,
-                            fastForward: true,
-                            autoPlayback: true,
-                            airplay: true,
-                            type: file.filename.split('.').pop().toLowerCase() === 'mkv' ? 'mp4' : file.filename.split('.').pop().toLowerCase(),
-                            moreVideoAttr: {
-                                'playsinline': true,
-                                'webkit-playsinline': true,
-                                'x5-video-player-type': 'h5-page',
-                            },
-                            subtitle: {
-                                url: matchedSubs.length > 0 ? matchedSubs[0].url : '',
-                                type: matchedSubs.length > 0 ? matchedSubs[0].type : 'vtt',
-                                style: {
-                                    color: '#ffffff',
-                                    fontSize: '20px',
-                                    textShadow: '0 0 4px #000, 0 0 4px #000',
-                                },
-                                escape: false,
-                            },
-                            settings: [
-                                buildArtplayerSubtitleSetting(file.filename, this.files || [], true, this.shareToken, (k) => this.t(k))
-                            ],
-                            icons: {
-                                loading: '<i class="fa-solid fa-spinner fa-spin text-4xl"></i>',
-                                state: '<i class="fa-solid fa-play text-4xl"></i>',
-                            }
-                        });
-                        this.playerInstance.on('error', (error, reconnectTime) => {
-                            const ua = navigator.userAgent;
-                            const isApple = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
-                            if (isApple) {
-                                this.showToast(this.t('err_video_unsupported_apple'), "error");
-                            }
-                        });
-                        this.playerInstance.on('fullscreen', (state) => document.body.classList.toggle('art-fullscreen-active', state));
-                        this.playerInstance.on('fullscreenWeb', (state) => document.body.classList.toggle('art-fullscreen-active', state));
-                    }
-                }, 50);
-            }
         },
         async loadFilePreview() {
             this.fileInfoModal.needsLoad = false;
@@ -7760,6 +8322,7 @@ function shareApp() {
 function shareFileApp() {
     return {
         lang: TeleCloud.lang,
+        showPrivacyModal: false,
         currentTheme: localStorage.getItem('theme') || 'system',
         token: '',
         id: '',
@@ -9603,8 +10166,10 @@ function shareFileApp() {
                                         buildArtplayerSubtitleSetting(this.filename, [], true, this.token, (k) => this.t(k))
                                     ],
                                     icons: {
-                                        loading: '<i class="fa-solid fa-spinner fa-spin text-4xl"></i>',
-                                        state: '<i class="fa-solid fa-play text-4xl"></i>',
+                                        loading: '<div class="premium-loader mx-auto"></div>',
+                                        state: '<svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" style="transform: translateX(2px);"><path d="M8 5v14l11-7z"/></svg>',
+                                        play: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+                                        pause: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
                                     }
                                 });
                                 this.playerInstance.on('error', (error, reconnectTime) => {

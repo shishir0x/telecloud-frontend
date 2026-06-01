@@ -290,10 +290,14 @@
             </div>
 
             <footer class="mt-10 text-center relative z-10 opacity-60 hover:opacity-100 transition-opacity">
-                <div class="flex items-center justify-center gap-4 mb-2">
-                    <a href="https://github.com/dabeecao/telecloud-go" target="_blank" class="text-slate-500 hover:text-blue-500 transition-colors">
-                        <i class="fa-brands fa-github text-lg"></i>
+                <div class="flex items-center justify-center gap-4 mb-2 text-xs font-semibold">
+                    <a href="https://github.com/dabeecao/telecloud-go" target="_blank" class="text-slate-500 hover:text-blue-500 transition-colors flex items-center gap-1.5">
+                        <i class="fa-brands fa-github text-base"></i> <span>GitHub</span>
                     </a>
+                    <span class="text-slate-300 dark:text-slate-700">|</span>
+                    <button @click="showPrivacyModal = true" class="text-slate-500 hover:text-blue-500 transition-colors flex items-center gap-1.5 outline-none">
+                        <i class="fa-solid fa-user-shield text-xs"></i> <span x-text="t('privacy_title')"></span>
+                    </button>
                 </div>
                 <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Powered by <span class="font-bold text-blue-500">TeleCloud OS</span> &copy; 2026 <span class="text-blue-600 dark:text-blue-400">@dabeecao</span></p>
             </footer>
@@ -1325,6 +1329,66 @@
                 <i class="fa-solid fa-chevron-right"></i>
             </button>
         </footer>
+    </div>    <!-- ==================== PRIVACY & SECURITY MODAL ==================== -->
+    <div x-show="showPrivacyModal" x-cloak
+        class="fixed inset-0 z-[600] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @keyup.window.escape="showPrivacyModal = false">
+        
+        <div @click.outside="showPrivacyModal = false"
+            class="glass-panel w-full max-w-lg rounded-[2.5rem] p-6 sm:p-8 border border-white/10 shadow-2xl relative flex flex-col gap-6 animate-modal-in max-h-[85vh] overflow-y-auto custom-scrollbar">
+            
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-200/50 dark:border-slate-700/50">
+                <h3 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
+                    <i class="fa-solid fa-user-shield text-blue-500"></i>
+                    <span x-text="t('privacy_title')"></span>
+                </h3>
+                <button @click="showPrivacyModal = false" class="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="space-y-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                <div class="space-y-4">
+                    <div class="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex gap-3">
+                        <i class="fa-solid fa-code text-blue-500 text-lg mt-0.5 shrink-0"></i>
+                        <div>
+                            <h4 class="font-bold text-slate-800 dark:text-slate-100 mb-1" x-text="t('privacy_os_title')"></h4>
+                            <p class="text-xs" x-text="t('privacy_os_desc')"></p>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex gap-3">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-500 text-lg mt-0.5 shrink-0"></i>
+                        <div>
+                            <h4 class="font-bold text-slate-800 dark:text-slate-100 mb-1" x-text="t('privacy_disclaimer_title')"></h4>
+                            <p class="text-xs" x-html="t('privacy_disclaimer_desc')"></p>
+                        </div>
+                    </div>
+
+                    <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex gap-3">
+                        <i class="fa-solid fa-lock text-emerald-500 text-lg mt-0.5 shrink-0"></i>
+                        <div>
+                            <h4 class="font-bold text-slate-800 dark:text-slate-100 mb-1" x-text="t('privacy_security_title')"></h4>
+                            <p class="text-xs" x-text="t('privacy_security_desc')"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <button @click="showPrivacyModal = false"
+                class="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-500/20 transition-all active:scale-95 text-center cursor-pointer"
+                x-text="t('privacy_understand')">
+            </button>
+        </div>
     </div>
 
 
