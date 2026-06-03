@@ -201,10 +201,7 @@
                             :placeholder="t('remote_urls_placeholder')"></textarea>
                     </template>
 
-                    <p class="mt-2 text-[10px] text-amber-500/80 italic flex items-start gap-1.5 leading-snug">
-                        <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
-                        <span x-text="t('remote_no_thumb_warning')"></span>
-                    </p>
+
 
                     <!-- Smart disk buffering info box -->
                     <div
@@ -243,10 +240,10 @@
 
     <!-- ===== Shared Links Directory Modal ===== -->
     <div x-show="sharedLinksModal" x-cloak
-        class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+        class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto"
         x-transition.opacity>
         <div @click.outside="sharedLinksModal = false"
-            class="glass-menu w-[95%] max-w-2xl max-h-[85vh] rounded-[2rem] p-6 shadow-2xl animate-modal-in border border-white/20 flex flex-col overflow-hidden">
+            class="glass-menu w-[95%] max-w-2xl max-h-[80dvh] md:max-h-[85vh] rounded-[2rem] p-6 shadow-2xl animate-modal-in border border-white/20 flex flex-col overflow-hidden">
             
             <div class="flex justify-between items-center mb-5 shrink-0">
                 <div class="flex items-center gap-3">
@@ -470,23 +467,31 @@
                         class="px-3 py-3 rounded-2xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-[10px] font-bold transition-colors uppercase tracking-wider border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                         x-text="t('dont_remind_today')"></button>
                     <button @click="closeUIModal(null)"
-                        class="px-3 py-3 rounded-2xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-[10px] font-bold transition-colors uppercase tracking-wider border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-                        x-text="t('close')"></button>
+                        class="px-3 py-3 rounded-2xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-[10px] font-bold transition-colors uppercase tracking-wider border border-transparent hover:border-slate-200 dark:hover:border-slate-700 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span x-text="t('close')"></span>
+                    </button>
                 </div>
             </div>
             <div class="flex justify-end gap-3 mt-2" x-show="modal.type !== 'alert' && modal.type !== 'update'">
                 <button @click="closeUIModal(null)"
-                    class="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium transition-colors"
-                    x-text="t('cancel')"></button>
+                    class="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium transition-colors flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-xmark"></i>
+                    <span x-text="t('cancel')"></span>
+                </button>
                 <button @click="closeUIModal(modal.type === 'prompt' ? modal.input : true)"
-                    class="px-5 py-2 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95"
-                    :class="modal.isDanger ? 'bg-red-600 hover:bg-red-500 shadow-red-500/25' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/25'"
-                    x-text="t('confirm')"></button>
+                    class="px-5 py-2 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-1.5"
+                    :class="modal.isDanger ? 'bg-red-600 hover:bg-red-500 shadow-red-500/25' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/25'">
+                    <i class="fa-solid fa-check"></i>
+                    <span x-text="t('confirm')"></span>
+                </button>
             </div>
             <div class="flex justify-end gap-3 mt-2" x-show="modal.type === 'alert'">
                 <button @click="closeUIModal(true)"
-                    class="px-5 py-2 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95 bg-blue-600 hover:bg-blue-500 shadow-blue-500/25"
-                    x-text="t('close')"></button>
+                    class="px-5 py-2 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95 bg-blue-600 hover:bg-blue-500 shadow-blue-500/25 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-xmark"></i>
+                    <span x-text="t('close')"></span>
+                </button>
             </div>
         </div>
     </div>
@@ -588,73 +593,109 @@
 
     <div x-show="contextMenu.show" x-cloak @click.outside="closeContextMenu" @contextmenu.prevent="closeContextMenu"
         :style="`top: ${contextMenu.y}px; left: ${contextMenu.x}px;`"
-        class="fixed glass-menu z-[100] w-52 rounded-2xl p-1.5 text-sm shadow-2xl" x-transition.opacity.duration.200ms>
+        class="fixed glass-menu z-[100] w-56 rounded-2xl p-2 text-sm shadow-2xl border border-slate-200/50 dark:border-slate-700/30" x-transition.opacity.duration.200ms>
         <template x-if="contextMenu.file">
             <div>
-                <template x-if="!contextMenu.file.is_folder">
-                    <button @click="startDownload(contextMenu.file.id); closeContextMenu()"
-                        class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors">
-                        <i class="fa-solid fa-download fa-fw text-slate-400"></i> <span x-text="t('download')"></span>
-                    </button>
-                </template>
-
-                <template x-if="contextMenu.file.is_folder">
-                    <button @click="startDownloadFolder(contextMenu.file.id); closeContextMenu()"
-                        :disabled="isOnlyFoldersSelected && selectedIds.length > 1 && selectedIds.includes(contextMenu.file.id)"
-                        class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none">
-                        <i class="fa-solid fa-download fa-fw text-slate-400"></i> <span x-text="t('download_folder')"></span>
-                    </button>
-                </template>
-
-                <button @click="toggleShare(contextMenu.file); closeContextMenu()"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors">
-                    <i class="fa-solid fa-link fa-fw text-emerald-500"></i>
-                    <span x-text="contextMenu.file.share_token ? t('revoke_link') : t('share_link')"></span>
-                </button>
-
-                <template x-if="contextMenu.file.share_token">
-                    <div class="space-y-1">
-                        <button @click="copyShareLink(contextMenu.file, 'regular'); closeContextMenu()"
-                            class="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-medium transition-colors text-xs">
-                            <i class="fa-solid fa-share-nodes fa-fw"></i> <span x-text="t('copy_share_link')"></span>
-                        </button>
-                        <template x-if="!contextMenu.file.is_folder && !contextMenu.file.has_share_password">
-                            <button @click="copyShareLink(contextMenu.file, 'direct'); closeContextMenu()"
-                                class="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-medium transition-colors text-xs">
-                                <i class="fa-solid fa-download fa-fw"></i> <span x-text="t('copy_direct_link')"></span>
-                            </button>
-                        </template>
+                <!-- File Info Header -->
+                <div class="px-2 py-1.5 mb-2 border-b border-slate-150 dark:border-slate-800/80 flex items-center gap-2">
+                    <div class="w-6 h-6 rounded flex items-center justify-center shrink-0"
+                        :class="contextMenu.file.is_folder ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500'">
+                        <i class="fa-solid text-xs" :class="contextMenu.file.is_folder ? 'fa-folder' : 'fa-file'"></i>
                     </div>
-                </template>
+                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200 truncate flex-1" x-text="contextMenu.file.filename"></span>
+                </div>
 
-                <div class="h-px bg-slate-200 dark:bg-slate-700/50 my-1 mx-2"></div>
+                <!-- Quick Actions Grid -->
+                <div class="grid grid-cols-4 gap-1 mb-2 px-1">
+                    <!-- Rename -->
+                    <button @click="renameFile(contextMenu.file); closeContextMenu()"
+                        class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors focus:outline-none"
+                        :title="t('rename')">
+                        <i class="fa-solid fa-pen text-sm mb-1 text-slate-500 dark:text-slate-400"></i>
+                        <span class="text-[9px] font-semibold" x-text="t('rename')"></span>
+                    </button>
 
-                <button @click="renameFile(contextMenu.file); closeContextMenu()"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors"><i
-                        class="fa-solid fa-pen fa-fw text-slate-400"></i> <span x-text="t('rename')"></span></button>
-                <button @click="copyToClipboard('move', [contextMenu.file.id]); closeContextMenu()"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors"><i
-                        class="fa-solid fa-folder-tree fa-fw text-slate-400"></i> <span
-                        x-text="t('move')"></span></button>
-                <button @click="copyToClipboard('copy', [contextMenu.file.id]); closeContextMenu()"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors"><i
-                        class="fa-solid fa-copy fa-fw text-slate-400"></i> <span x-text="t('copy')"></span></button>
+                    <!-- Copy -->
+                    <button @click="copyToClipboard('copy', [contextMenu.file.id]); openFolderPicker(); closeContextMenu()"
+                        class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors focus:outline-none"
+                        :title="t('copy')">
+                        <i class="fa-solid fa-copy text-sm mb-1 text-slate-500 dark:text-slate-400"></i>
+                        <span class="text-[9px] font-semibold" x-text="t('copy')"></span>
+                    </button>
 
-                <div class="h-px bg-slate-200 dark:bg-slate-700/50 my-1 mx-2"></div>
+                    <!-- Move -->
+                    <button @click="copyToClipboard('move', [contextMenu.file.id]); openFolderPicker(); closeContextMenu()"
+                        class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors focus:outline-none"
+                        :title="t('move')">
+                        <i class="fa-solid fa-folder-tree text-sm mb-1 text-slate-500 dark:text-slate-400"></i>
+                        <span class="text-[9px] font-semibold" x-text="t('move')"></span>
+                    </button>
 
-                <button @click="deleteFile(contextMenu.file.id); closeContextMenu()"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 dark:text-red-400 font-medium transition-colors"><i
-                        class="fa-solid fa-trash fa-fw"></i> <span x-text="t('delete')"></span></button>
+                    <!-- Delete -->
+                    <button @click="deleteFile(contextMenu.file.id); closeContextMenu()"
+                        class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 transition-colors focus:outline-none"
+                        :title="t('delete')">
+                        <i class="fa-solid fa-trash text-sm mb-1 text-red-500"></i>
+                        <span class="text-[9px] font-semibold text-red-500" x-text="t('delete')"></span>
+                    </button>
+                </div>
+
+                <!-- Divider -->
+                <div class="h-px bg-slate-150 dark:bg-slate-800/80 mx-1.5 mb-1.5"></div>
+
+                <!-- Secondary List Actions -->
+                <div class="space-y-0.5 px-0.5">
+                    <!-- Download -->
+                    <button @click="if(contextMenu.file.is_folder) { startDownloadFolder(contextMenu.file.id) } else { startDownload(contextMenu.file.id) }; closeContextMenu()"
+                        class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                        <i class="fa-solid fa-download fa-fw text-slate-400"></i>
+                        <span x-text="contextMenu.file.is_folder ? t('download_folder') : t('download')"></span>
+                    </button>
+
+                    <!-- Share -->
+                    <button @click="toggleShare(contextMenu.file); closeContextMenu()"
+                        class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                        <i class="fa-solid fa-link fa-fw" :class="contextMenu.file.share_token ? 'text-red-500' : 'text-slate-400'"></i>
+                        <span x-text="contextMenu.file.share_token ? t('revoke_link') : t('share_link')"></span>
+                    </button>
+
+                    <!-- Copy Share Link (if shared) -->
+                    <template x-if="contextMenu.file.share_token">
+                        <button @click="copyShareLink(contextMenu.file, 'regular'); closeContextMenu()"
+                            class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                            <i class="fa-solid fa-share-nodes fa-fw text-emerald-500"></i>
+                            <span x-text="t('copy_share_link')"></span>
+                        </button>
+                    </template>
+                    
+                    <!-- Copy Direct Link (if shared & not folder & no password) -->
+                    <template x-if="contextMenu.file.share_token && !contextMenu.file.is_folder && !contextMenu.file.has_share_password">
+                        <button @click="copyShareLink(contextMenu.file, 'direct'); closeContextMenu()"
+                            class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                            <i class="fa-solid fa-cloud-arrow-down fa-fw text-blue-500"></i>
+                            <span x-text="t('copy_direct_link')"></span>
+                        </button>
+                    </template>
+
+                    <!-- Regenerate Cover (if supported) -->
+                    <template x-if="supportsThumbnail(contextMenu.file)">
+                        <button @click="regenerateThumb(contextMenu.file.id); closeContextMenu()"
+                            class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                            <i class="fa-solid fa-image fa-fw text-slate-400"></i>
+                            <span x-text="t('regenerate_cover')"></span>
+                        </button>
+                    </template>
+                </div>
             </div>
         </template>
     </div>
 
     <div x-show="fileInfoModal.show" x-cloak
-        class="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+        class="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto"
         x-transition.opacity>
         <div @click.outside="closeFileInfoModal()"
-            class="glass-menu w-[90%] max-h-[90vh] rounded-[2rem] shadow-2xl animate-modal-in border border-white/20 transition-all duration-300 flex flex-col overflow-hidden"
-            :class="fileInfoModal.isLarge ? (fileInfoModal.isMedia ? 'md:max-w-lg max-w-sm' : 'modal-wide') : 'max-w-sm'">
+            class="glass-menu w-[90%] max-h-[85dvh] md:max-h-[90vh] rounded-[2rem] shadow-2xl animate-modal-in border border-white/20 transition-all duration-300 flex flex-col overflow-hidden"
+            :class="(fileInfoModal.isLarge && !fileInfoModal.needsLoad && !fileInfoModal.isPreviewLoading && (!fileInfoModal.tooLarge || fileInfoModal.bypassWarning)) ? (fileInfoModal.isMedia ? 'md:max-w-lg max-w-sm' : 'modal-wide') : 'max-w-sm'">
 
             <!-- Non-scrolling Opaque Header -->
             <div
@@ -882,17 +923,25 @@
                             <span class="text-[11px] text-center leading-tight"
                                 x-text="fileInfoModal.file?.share_token ? t('revoke_link') : t('share_link')"></span>
                         </button>
+                        <template x-if="supportsThumbnail(fileInfoModal.file)">
+                            <button @click="regenerateThumb(fileInfoModal.file.id); closeFileInfoModal()"
+                                class="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition-colors">
+                                <i class="fa-solid fa-image text-base"></i>
+                                <span class="text-[11px] text-center leading-tight" x-text="t('regenerate_cover')"></span>
+                            </button>
+                        </template>
+
                         <button @click="renameFile(fileInfoModal.file); closeFileInfoModal()"
                             class="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition-colors">
                             <i class="fa-solid fa-pen text-base"></i>
                             <span class="text-[11px]" x-text="t('rename')"></span>
                         </button>
-                        <button @click="copyToClipboard('move', [fileInfoModal.file?.id]); closeFileInfoModal()"
+                        <button @click="copyToClipboard('move', [fileInfoModal.file?.id]); openFolderPicker(); closeFileInfoModal()"
                             class="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition-colors">
                             <i class="fa-solid fa-folder-tree text-base"></i>
                             <span class="text-[11px]" x-text="t('move')"></span>
                         </button>
-                        <button @click="copyToClipboard('copy', [fileInfoModal.file?.id]); closeFileInfoModal()"
+                        <button @click="copyToClipboard('copy', [fileInfoModal.file?.id]); openFolderPicker(); closeFileInfoModal()"
                             class="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition-colors">
                             <i class="fa-solid fa-copy text-base"></i>
                             <span class="text-[11px]" x-text="t('copy')"></span>
@@ -903,6 +952,11 @@
                             <span class="text-[11px]" x-text="t('delete')"></span>
                         </button>
                     </div>
+                    <button @click="closeFileInfoModal()"
+                        class="w-full mt-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium transition-all text-xs flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span x-text="t('close')"></span>
+                    </button>
                 </div>
             </div> <!-- Closes Scrollable Content -->
         </div>
@@ -2962,28 +3016,6 @@
 
                     <div x-show="!isLoading" x-transition.opacity>
 
-                        <div x-show="clipboard.ids.length > 0" x-cloak
-                            class="mb-4 p-4 md:p-5 rounded-2xl bg-blue-50 dark:bg-indigo-500/10 border border-blue-200 dark:border-indigo-500/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 backdrop-blur-md"
-                            x-transition.scale.origin.top>
-                            <div class="flex items-center gap-3">
-                                <div
-                                    class="p-2.5 flex items-center justify-center bg-blue-100 dark:bg-indigo-500/20 rounded-lg text-blue-600 dark:text-indigo-400">
-                                    <i class="fa-solid fa-clipboard text-xl"></i>
-                                </div>
-                                <span class="text-blue-800 dark:text-indigo-300 font-medium text-sm"
-                                    x-html="t('pasting_items', {n: clipboard.ids.length, a: (clipboard.action === 'move' ? t('move') : t('copy'))})">
-                                </span>
-                            </div>
-                            <div class="flex gap-2 w-full sm:w-auto">
-                                <button @click="clipboard = {action: null, ids: []}"
-                                    class="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium transition-colors"
-                                    x-text="t('cancel')"></button>
-                                <button @click="executePaste"
-                                    class="flex-1 sm:flex-none px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm shadow-lg shadow-blue-500/25 font-semibold transition-transform active:scale-95"
-                                    x-text="t('paste_here')"></button>
-                            </div>
-                        </div>
-
                         <div class="w-full text-left border-collapse relative">
                             <div class="mt-2 pb-10"
                                 :class="viewMode === 'list' ? 'space-y-1.5' : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 px-1'">
@@ -3062,54 +3094,101 @@
                                                     </button>
                                                     <div x-show="openMenuId === file.id" x-cloak x-transition
                                                         :class="menuOpensUp ? 'bottom-full mb-1 origin-bottom-right' : 'top-10 mt-1 origin-top-right'"
-                                                        class="glass-menu absolute right-0 w-52 rounded-2xl p-1.5 z-[60] text-sm text-left">
-                                                        <template x-if="file.share_token">
-                                                            <div class="space-y-1 mb-1">
-                                                                <button
-                                                                    @click="copyShareLink(file, 'regular'); openMenuId = null"
-                                                                    class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium transition-colors text-xs">
-                                                                    <i class="fa-solid fa-share-nodes fa-fw"></i> <span
-                                                                        x-text="t('copy_share_link')"></span>
-                                                                </button>
-                                                                <template
-                                                                    x-if="!file.is_folder && !file.has_share_password">
-                                                                    <button
-                                                                        @click="copyShareLink(file, 'direct'); openMenuId = null"
-                                                                        class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium transition-colors text-xs">
-                                                                        <i class="fa-solid fa-download fa-fw"></i> <span
-                                                                            x-text="t('copy_direct_link')"></span>
-                                                                    </button>
-                                                                </template>
+                                                        class="glass-menu absolute right-0 w-56 rounded-2xl p-2 z-[60] text-sm text-left shadow-xl border border-slate-200/50 dark:border-slate-700/30">
+                                                        
+                                                        <!-- File Info Header -->
+                                                        <div class="px-2 py-1.5 mb-2 border-b border-slate-150 dark:border-slate-800/80 flex items-center gap-2">
+                                                            <div class="w-6 h-6 rounded flex items-center justify-center shrink-0"
+                                                                :class="file.is_folder ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500'">
+                                                                <i class="fa-solid text-xs" :class="file.is_folder ? 'fa-folder' : 'fa-file'"></i>
                                                             </div>
-                                                        </template>
-
-                                                        <button @click="toggleShare(file); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors">
-                                                            <i class="fa-solid fa-link fa-fw text-emerald-500"></i>
-                                                            <span
-                                                                x-text="file.share_token ? t('revoke_link') : t('share_link')"></span>
-                                                        </button>
-
-                                                        <div class="h-px bg-slate-200 dark:bg-slate-700/50 my-1 mx-2">
+                                                            <span class="text-xs font-bold text-slate-700 dark:text-slate-200 truncate flex-1" x-text="file.filename"></span>
                                                         </div>
-                                                        <button @click="renameFile(file); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors"><i
-                                                                class="fa-solid fa-pen fa-fw text-slate-400"></i> <span
-                                                                x-text="t('rename')"></span></button>
-                                                        <button
-                                                            @click="copyToClipboard('move', [file.id]); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors"><i
-                                                                class="fa-solid fa-folder-tree fa-fw text-slate-400"></i>
-                                                            <span x-text="t('move')"></span></button>
-                                                        <button
-                                                            @click="copyToClipboard('copy', [file.id]); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors"><i
-                                                                class="fa-solid fa-copy fa-fw text-slate-400"></i> <span
-                                                                x-text="t('copy')"></span></button>
-                                                        <button @click="deleteFile(file.id); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 dark:text-red-400 font-medium transition-colors"><i
-                                                                class="fa-solid fa-trash fa-fw"></i> <span
-                                                                x-text="t('delete')"></span></button>
+
+                                                        <!-- Quick Actions Grid -->
+                                                        <div class="grid grid-cols-4 gap-1 mb-2 px-1">
+                                                            <!-- Rename -->
+                                                            <button @click="renameFile(file); openMenuId = null"
+                                                                class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors focus:outline-none"
+                                                                :title="t('rename')">
+                                                                <i class="fa-solid fa-pen text-sm mb-1 text-slate-500 dark:text-slate-400"></i>
+                                                                <span class="text-[9px] font-semibold" x-text="t('rename')"></span>
+                                                            </button>
+
+                                                            <!-- Copy -->
+                                                            <button @click="copyToClipboard('copy', [file.id]); openFolderPicker(); openMenuId = null"
+                                                                class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors focus:outline-none"
+                                                                :title="t('copy')">
+                                                                <i class="fa-solid fa-copy text-sm mb-1 text-slate-500 dark:text-slate-400"></i>
+                                                                <span class="text-[9px] font-semibold" x-text="t('copy')"></span>
+                                                            </button>
+
+                                                            <!-- Move -->
+                                                            <button @click="copyToClipboard('move', [file.id]); openFolderPicker(); openMenuId = null"
+                                                                class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors focus:outline-none"
+                                                                :title="t('move')">
+                                                                <i class="fa-solid fa-folder-tree text-sm mb-1 text-slate-500 dark:text-slate-400"></i>
+                                                                <span class="text-[9px] font-semibold" x-text="t('move')"></span>
+                                                            </button>
+
+                                                            <!-- Delete -->
+                                                            <button @click="deleteFile(file.id); openMenuId = null"
+                                                                class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 transition-colors focus:outline-none"
+                                                                :title="t('delete')">
+                                                                <i class="fa-solid fa-trash text-sm mb-1 text-red-500"></i>
+                                                                <span class="text-[9px] font-semibold text-red-500" x-text="t('delete')"></span>
+                                                            </button>
+                                                        </div>
+
+                                                        <!-- Divider -->
+                                                        <div class="h-px bg-slate-150 dark:bg-slate-800/80 mx-1.5 mb-1.5"></div>
+
+                                                        <!-- Secondary List Actions -->
+                                                        <div class="space-y-0.5 px-0.5">
+                                                            <!-- Download -->
+                                                            <button @click="if(file.is_folder) { startDownloadFolder(file.id) } else { startDownload(file.id) }; openMenuId = null"
+                                                                class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                <i class="fa-solid fa-download fa-fw text-slate-400"></i>
+                                                                <span x-text="file.is_folder ? t('download_folder') : t('download')"></span>
+                                                            </button>
+
+                                                            <!-- Share -->
+                                                            <button @click="toggleShare(file); openMenuId = null"
+                                                                class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                <i class="fa-solid fa-link fa-fw" :class="file.share_token ? 'text-red-500' : 'text-slate-400'"></i>
+                                                                <span x-text="file.share_token ? t('revoke_link') : t('share_link')"></span>
+                                                            </button>
+                                                            <!-- Copy Share Link (if shared) -->
+                                                            <template x-if="file.share_token">
+                                                                <button @click="copyShareLink(file, 'regular'); openMenuId = null"
+                                                                    class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                    <i class="fa-solid fa-share-nodes fa-fw text-emerald-500"></i>
+                                                                    <span x-text="t('copy_share_link')"></span>
+                                                                </button>
+                                                            </template>
+                                                            
+                                                            <!-- Copy Direct Link (if shared & not folder & no password) -->
+                                                            <template x-if="file.share_token && !file.is_folder && !file.has_share_password">
+                                                                <button @click="copyShareLink(file, 'direct'); openMenuId = null"
+                                                                    class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                    <i class="fa-solid fa-cloud-arrow-down fa-fw text-blue-500"></i>
+                                                                    <span x-text="t('copy_direct_link')"></span>
+                                                                </button>
+                                                            </template>
+
+
+
+
+
+                                                            <!-- Regenerate Cover (if supported) -->
+                                                            <template x-if="supportsThumbnail(file)">
+                                                                <button @click="regenerateThumb(file.id); openMenuId = null"
+                                                                    class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                    <i class="fa-solid fa-image fa-fw text-slate-400"></i>
+                                                                    <span x-text="t('regenerate_cover')"></span>
+                                                                </button>
+                                                            </template>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -3138,52 +3217,101 @@
                                                     </button>
                                                     <div x-show="openMenuId === file.id" x-cloak x-transition
                                                         :class="menuOpensUp ? 'bottom-full mb-1 origin-bottom-right' : 'top-8 mt-1 origin-top-right'"
-                                                        class="glass-menu absolute right-0 w-52 rounded-2xl p-1.5 z-[60] text-sm text-left">
-                                                        <template x-if="file.share_token">
-                                                            <div class="space-y-1 mb-1">
-                                                                <button
-                                                                    @click="copyShareLink(file, 'regular'); openMenuId = null"
-                                                                    class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium transition-colors text-xs">
-                                                                    <i class="fa-solid fa-share-nodes fa-fw"></i> <span
-                                                                        x-text="t('copy_share_link')"></span>
-                                                                </button>
-                                                                <template
-                                                                    x-if="!file.is_folder && !file.has_share_password">
-                                                                    <button
-                                                                        @click="copyShareLink(file, 'direct'); openMenuId = null"
-                                                                        class="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium transition-colors text-xs">
-                                                                        <i class="fa-solid fa-download fa-fw"></i> <span
-                                                                            x-text="t('copy_direct_link')"></span>
-                                                                    </button>
-                                                                </template>
+                                                        class="glass-menu absolute right-0 w-56 rounded-2xl p-2 z-[60] text-sm text-left shadow-xl border border-slate-200/50 dark:border-slate-700/30">
+                                                        
+                                                        <!-- File Info Header -->
+                                                        <div class="px-2 py-1.5 mb-2 border-b border-slate-150 dark:border-slate-800/80 flex items-center gap-2">
+                                                            <div class="w-6 h-6 rounded flex items-center justify-center shrink-0"
+                                                                :class="file.is_folder ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500'">
+                                                                <i class="fa-solid text-xs" :class="file.is_folder ? 'fa-folder' : 'fa-file'"></i>
                                                             </div>
-                                                        </template>
-                                                        <button @click="toggleShare(file); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors">
-                                                            <i class="fa-solid fa-link fa-fw text-emerald-500"></i>
-                                                            <span
-                                                                x-text="file.share_token ? t('revoke_link') : t('share_link')"></span>
-                                                        </button>
-                                                        <div class="h-px bg-slate-200 dark:bg-slate-700/50 my-1 mx-2">
+                                                            <span class="text-xs font-bold text-slate-700 dark:text-slate-200 truncate flex-1" x-text="file.filename"></span>
                                                         </div>
-                                                        <button @click="renameFile(file); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors"><i
-                                                                class="fa-solid fa-pen fa-fw text-slate-400"></i> <span
-                                                                x-text="t('rename')"></span></button>
-                                                        <button
-                                                            @click="copyToClipboard('move', [file.id]); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors"><i
-                                                                class="fa-solid fa-folder-tree fa-fw text-slate-400"></i>
-                                                            <span x-text="t('move')"></span></button>
-                                                        <button
-                                                            @click="copyToClipboard('copy', [file.id]); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium transition-colors"><i
-                                                                class="fa-solid fa-copy fa-fw text-slate-400"></i> <span
-                                                                x-text="t('copy')"></span></button>
-                                                        <button @click="deleteFile(file.id); openMenuId = null"
-                                                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 dark:text-red-400 font-medium transition-colors"><i
-                                                                class="fa-solid fa-trash fa-fw"></i> <span
-                                                                x-text="t('delete')"></span></button>
+
+                                                        <!-- Quick Actions Grid -->
+                                                        <div class="grid grid-cols-4 gap-1 mb-2 px-1">
+                                                            <!-- Rename -->
+                                                            <button @click="renameFile(file); openMenuId = null"
+                                                                class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors focus:outline-none"
+                                                                :title="t('rename')">
+                                                                <i class="fa-solid fa-pen text-sm mb-1 text-slate-500 dark:text-slate-400"></i>
+                                                                <span class="text-[9px] font-semibold" x-text="t('rename')"></span>
+                                                            </button>
+
+                                                            <!-- Copy -->
+                                                            <button @click="copyToClipboard('copy', [file.id]); openFolderPicker(); openMenuId = null"
+                                                                class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors focus:outline-none"
+                                                                :title="t('copy')">
+                                                                <i class="fa-solid fa-copy text-sm mb-1 text-slate-500 dark:text-slate-400"></i>
+                                                                <span class="text-[9px] font-semibold" x-text="t('copy')"></span>
+                                                            </button>
+
+                                                            <!-- Move -->
+                                                            <button @click="copyToClipboard('move', [file.id]); openFolderPicker(); openMenuId = null"
+                                                                class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-350 transition-colors focus:outline-none"
+                                                                :title="t('move')">
+                                                                <i class="fa-solid fa-folder-tree text-sm mb-1 text-slate-500 dark:text-slate-400"></i>
+                                                                <span class="text-[9px] font-semibold" x-text="t('move')"></span>
+                                                            </button>
+
+                                                            <!-- Delete -->
+                                                            <button @click="deleteFile(file.id); openMenuId = null"
+                                                                class="flex flex-col items-center justify-center py-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 transition-colors focus:outline-none"
+                                                                :title="t('delete')">
+                                                                <i class="fa-solid fa-trash text-sm mb-1 text-red-500"></i>
+                                                                <span class="text-[9px] font-semibold text-red-500" x-text="t('delete')"></span>
+                                                            </button>
+                                                        </div>
+
+                                                        <!-- Divider -->
+                                                        <div class="h-px bg-slate-150 dark:bg-slate-800/80 mx-1.5 mb-1.5"></div>
+
+                                                        <!-- Secondary List Actions -->
+                                                        <div class="space-y-0.5 px-0.5">
+                                                            <!-- Download -->
+                                                            <button @click="if(file.is_folder) { startDownloadFolder(file.id) } else { startDownload(file.id) }; openMenuId = null"
+                                                                class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                <i class="fa-solid fa-download fa-fw text-slate-400"></i>
+                                                                <span x-text="file.is_folder ? t('download_folder') : t('download')"></span>
+                                                            </button>
+
+                                                            <!-- Share -->
+                                                            <button @click="toggleShare(file); openMenuId = null"
+                                                                class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                <i class="fa-solid fa-link fa-fw" :class="file.share_token ? 'text-red-500' : 'text-slate-400'"></i>
+                                                                <span x-text="file.share_token ? t('revoke_link') : t('share_link')"></span>
+                                                            </button>
+                                                            <!-- Copy Share Link (if shared) -->
+                                                            <template x-if="file.share_token">
+                                                                <button @click="copyShareLink(file, 'regular'); openMenuId = null"
+                                                                    class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                    <i class="fa-solid fa-share-nodes fa-fw text-emerald-500"></i>
+                                                                    <span x-text="t('copy_share_link')"></span>
+                                                                </button>
+                                                            </template>
+                                                            
+                                                            <!-- Copy Direct Link (if shared & not folder & no password) -->
+                                                            <template x-if="file.share_token && !file.is_folder && !file.has_share_password">
+                                                                <button @click="copyShareLink(file, 'direct'); openMenuId = null"
+                                                                    class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                    <i class="fa-solid fa-cloud-arrow-down fa-fw text-blue-500"></i>
+                                                                    <span x-text="t('copy_direct_link')"></span>
+                                                                </button>
+                                                            </template>
+
+
+
+
+
+                                                            <!-- Regenerate Cover (if supported) -->
+                                                            <template x-if="supportsThumbnail(file)">
+                                                                <button @click="regenerateThumb(file.id); openMenuId = null"
+                                                                    class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold transition-colors text-xs">
+                                                                    <i class="fa-solid fa-image fa-fw text-slate-400"></i>
+                                                                    <span x-text="t('regenerate_cover')"></span>
+                                                                </button>
+                                                            </template>
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -3468,13 +3596,13 @@
                 <span class="hidden sm:block" x-text="t('slideshow')"></span>
             </button>
 
-            <button @click="copyToClipboard('move', selectedIds)" :title="t('move')"
+            <button @click="copyToClipboard('move', selectedIds); openFolderPicker()" :title="t('move')"
                 class="p-2.5 sm:px-3 sm:py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition flex items-center gap-2 whitespace-nowrap flex-shrink-0">
                 <i class="fa-solid fa-scissors text-lg sm:text-base"></i>
                 <span class="hidden sm:block" x-text="t('move')"></span>
             </button>
 
-            <button @click="copyToClipboard('copy', selectedIds)" :title="t('copy')"
+            <button @click="copyToClipboard('copy', selectedIds); openFolderPicker()" :title="t('copy')"
                 class="p-2.5 sm:px-3 sm:py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition flex items-center gap-2 whitespace-nowrap flex-shrink-0">
                 <i class="fa-solid fa-copy text-lg sm:text-base"></i>
                 <span class="hidden sm:block" x-text="t('copy')"></span>
@@ -3504,7 +3632,7 @@
     </div>
 
     <div x-show="toastModal.show" x-cloak
-        class="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+        class="fixed inset-0 z-[500] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
         x-transition.opacity>
         <div @click.outside="if(!toastModal.persistent) toastModal.show = false"
             class="glass-menu w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-modal-in border border-white/20 relative flex flex-col items-center text-center">
@@ -3519,10 +3647,77 @@
             <p class="text-slate-600 dark:text-slate-300 text-sm mb-2 break-all px-2" x-text="toastModal.message"></p>
 
             <button x-show="!toastModal.persistent" @click="toastModal.show = false"
-                class="mt-4 w-full py-3 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95"
-                :class="toastModal.type === 'error' ? 'bg-red-600 hover:bg-red-500 shadow-red-500/25' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/25'"
-                x-text="t('close')">
+                class="mt-4 w-full py-3 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-1.5"
+                :class="toastModal.type === 'error' ? 'bg-red-600 hover:bg-red-500 shadow-red-500/25' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/25'">
+                <i class="fa-solid fa-xmark"></i>
+                <span x-text="t('close')"></span>
             </button>
+        </div>
+    </div>
+
+    <!-- Child Account Success Modal (Admin View) -->
+    <div x-show="childSuccessModal.show" x-cloak
+        class="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+        x-transition.opacity>
+        <div class="glass-menu w-[90%] max-w-sm rounded-[2rem] p-6 shadow-2xl animate-modal-in border border-white/20 relative">
+            
+            <div class="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <i class="fa-solid fa-user-check text-3xl"></i>
+            </div>
+            
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white text-center mb-2" x-text="childSuccessModal.title"></h3>
+            <p class="text-slate-500 dark:text-slate-400 text-xs text-center mb-6" x-text="t('child_modal_warning')"></p>
+            
+            <div class="space-y-4 mb-6">
+                <!-- Username Field -->
+                <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block" x-text="t('username')"></label>
+                    <div class="flex items-center justify-between p-3.5 bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 rounded-xl">
+                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-200 select-all" x-text="childSuccessModal.username"></span>
+                        <button @click="copyTextToSystemClipboard(childSuccessModal.username, 'username')" 
+                                :class="childSuccessModal.copiedUsername ? 'text-emerald-500' : 'text-slate-400 hover:text-blue-500'" 
+                                class="p-1 transition-colors">
+                            <i class="fa-solid" :class="childSuccessModal.copiedUsername ? 'fa-check' : 'fa-copy fa-regular'"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Password Field -->
+                <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block" x-text="t('password')"></label>
+                    <div class="flex items-center justify-between p-3.5 bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 rounded-xl relative">
+                        <input :type="childSuccessModal.showPassword ? 'text' : 'password'" 
+                               readonly 
+                               :value="childSuccessModal.password"
+                               class="bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-sm font-mono font-bold text-slate-800 dark:text-slate-200 w-[calc(100%-60px)] select-all">
+                        <div class="flex items-center gap-2">
+                            <button @click="childSuccessModal.showPassword = !childSuccessModal.showPassword" class="text-slate-400 hover:text-blue-500 p-1 transition-colors">
+                                <i class="fa-regular" :class="childSuccessModal.showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                            </button>
+                            <button @click="copyTextToSystemClipboard(childSuccessModal.password, 'password')" 
+                                    :class="childSuccessModal.copiedPassword ? 'text-emerald-500' : 'text-slate-400 hover:text-blue-500'" 
+                                    class="p-1 transition-colors">
+                                <i class="fa-solid" :class="childSuccessModal.copiedPassword ? 'fa-check' : 'fa-copy fa-regular'"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="flex gap-3 pt-2">
+                <button @click="copyCredentials()" 
+                    :class="childSuccessModal.copiedBoth ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'"
+                    class="flex-1 py-3 px-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 text-xs border border-transparent">
+                    <i class="fa-solid" :class="childSuccessModal.copiedBoth ? 'fa-circle-check' : 'fa-copy'"></i>
+                    <span x-text="childSuccessModal.copiedBoth ? (t('copied') || 'Copied!') : t('copy_both')"></span>
+                </button>
+                <button @click="childSuccessModal.show = false" 
+                    class="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-lg shadow-blue-500/25 transition-all text-sm flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-xmark"></i>
+                    <span x-text="t('close')"></span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -3682,7 +3877,9 @@
     <!-- ==================== IMMERSIVE MEDIA PLAYER MODAL (Cinema Mode) ==================== -->
     <div x-show="mediaPlayerModal.show" x-cloak
         :class="mediaPlayerModal.minimized 
-            ? 'media-player-minimized immersive-player-modal fixed bottom-6 right-6 z-[600] w-[340px] md:w-[380px] rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-purple-500/30 shadow-2xl select-none flex flex-col overflow-hidden transition-all duration-300 pointer-events-auto hover:border-purple-500/50 hover:shadow-purple-500/10' 
+            ? (mediaPlayerModal.bubbleMode
+                ? 'media-player-minimized immersive-player-modal fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 z-[600] w-14 h-14 rounded-full bg-slate-950/95 border border-purple-500/40 shadow-2xl select-none flex items-center justify-center transition-all duration-300 pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-105 hover:border-purple-500/60 shadow-purple-500/10'
+                : 'media-player-minimized immersive-player-modal fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 z-[600] w-[calc(100%-2rem)] max-w-[340px] md:w-[380px] rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-purple-500/30 shadow-2xl select-none flex flex-col overflow-hidden transition-all duration-300 pointer-events-auto hover:border-purple-500/50 hover:shadow-purple-500/10')
             : 'immersive-player-modal fixed inset-0 z-[600] flex flex-col bg-slate-950/98 backdrop-blur-xl select-none transition-all duration-300'"
         :style="mediaPlayerModal.minimized && mediaPlayerModal.x !== null ? 'left: ' + mediaPlayerModal.x + 'px; top: ' + mediaPlayerModal.y + 'px; bottom: auto; right: auto;' : ''"
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
@@ -3694,7 +3891,8 @@
         <div x-show="!mediaPlayerModal.minimized" class="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-black/40 pointer-events-none"></div>
 
         <!-- Top Header Panel (Glassmorphism) -->
-        <header @mousedown="startDrag($event)" @touchstart="startDrag($event)"
+        <header x-show="!mediaPlayerModal.minimized || !mediaPlayerModal.bubbleMode"
+            @mousedown="startDrag($event)" @touchstart="startDrag($event)"
             :class="mediaPlayerModal.minimized ? 'relative z-20 flex items-center justify-between p-3 bg-slate-900/60 backdrop-blur-md border-b border-white/5 shadow-md gap-4 cursor-grab active:cursor-grabbing' : 'relative z-20 flex items-center justify-between p-4 bg-slate-900/40 backdrop-blur-md border-b border-white/5 shadow-lg gap-4'">
             <div class="flex items-center gap-3 min-w-0">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
@@ -3720,12 +3918,19 @@
                     :title="t('next_track_tooltip')">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
-                <!-- Playlist Sidebar Toggle Button (when NOT minimized) -->
-                <button x-show="!mediaPlayerModal.minimized" @click="mediaPlayerModal.playlistOpen = !mediaPlayerModal.playlistOpen"
+                <!-- Playlist Sidebar Toggle Button -->
+                <button @click="mediaPlayerModal.playlistOpen = !mediaPlayerModal.playlistOpen"
                     class="p-2 rounded-full transition-colors shrink-0"
                     :class="mediaPlayerModal.playlistOpen ? 'text-amber-400 bg-white/15' : 'text-slate-400 hover:text-white hover:bg-white/10'"
                     :title="t('playlist_tooltip')">
                     <i class="fa-solid fa-list"></i>
+                </button>
+
+                <!-- Collapse to Bubble Button (only when minimized) -->
+                <button x-show="mediaPlayerModal.minimized" @click="mediaPlayerModal.bubbleMode = true"
+                    class="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
+                    :title="t('bubble_mode_tooltip') || 'Bubble Mode'">
+                    <i class="fa-regular fa-circle text-xs"></i>
                 </button>
 
                 <!-- Minimize/Restore Button (always visible) -->
@@ -3734,6 +3939,9 @@
                     :title="mediaPlayerModal.minimized ? t('maximize') : t('minimize')">
                     <i class="fa-solid" :class="mediaPlayerModal.minimized ? 'fa-expand' : 'fa-compress'"></i>
                 </button>
+
+
+
                 <!-- Close Button (only visible when minimized) -->
                 <button x-show="mediaPlayerModal.minimized" @click="closeMediaPlayerModal()"
                     class="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
@@ -3744,7 +3952,8 @@
         </header>
 
         <!-- Media Player Stage -->
-        <div :class="mediaPlayerModal.minimized ? 'p-0 flex-none' : 'flex-1 flex items-stretch p-0 relative z-10 overflow-hidden h-[calc(100%-64px)] md:h-[calc(100%-68px)]'">
+        <div x-show="!mediaPlayerModal.minimized || !mediaPlayerModal.bubbleMode"
+            :class="mediaPlayerModal.minimized ? 'p-0 flex-none' : 'flex-1 flex items-stretch p-0 relative z-10 overflow-hidden h-[calc(100%-64px)] md:h-[calc(100%-68px)]'">
             <!-- Left Media Container (flexible, scroll/stretch-friendly) -->
             <div :class="mediaPlayerModal.minimized ? 'w-full' : 'flex-1 flex items-center justify-center p-4 min-w-0 overflow-y-auto'">
                 <!-- Video Player (16:9 Aspect ratio) -->
@@ -3853,6 +4062,76 @@
                     </template>
                 </div>
             </div>
+        </div>
+
+        <!-- Compact Playlist for Minimized Player (Miniplayer) -->
+        <div x-show="mediaPlayerModal.minimized && mediaPlayerModal.playlistOpen && !mediaPlayerModal.bubbleMode"
+             class="miniplayer-playlist border-t border-white/5 bg-slate-950/80 backdrop-blur-md flex flex-col max-h-[160px] overflow-y-auto custom-scrollbar shrink-0"
+             x-effect="if (mediaPlayerModal.minimized && mediaPlayerModal.playlistOpen && mediaPlayerModal.playlistIndex !== -1) {
+                 $nextTick(() => {
+                     const activeEl = $el.querySelector('.active-mini-track');
+                     if (activeEl) {
+                         activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                     }
+                 });
+             }">
+            <template x-for="(f, index) in mediaPlayerModal.playlist" :key="f.id">
+                <button @click="playTrackByIndex(index)"
+                    class="miniplayer-playlist-item w-full flex items-center gap-2.5 p-2 transition-all text-left text-[11px] outline-none border-b border-white/5 last:border-b-0"
+                    :class="index === mediaPlayerModal.playlistIndex 
+                        ? 'bg-blue-600/20 text-blue-400 font-bold border-l-2 border-blue-500 active-mini-track' 
+                        : 'text-slate-300 hover:bg-white/5'">
+                    <i class="fa-solid shrink-0" :class="['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus', 'oga', 'aac', 'm4b'].includes(f.filename.split('.').pop().toLowerCase()) ? 'fa-music text-amber-500/80' : 'fa-film text-purple-500/80'"></i>
+                    <span class="truncate flex-1" x-text="f.filename"></span>
+                    <span class="text-[9px] text-slate-500 shrink-0" x-text="formatBytes(f.size)"></span>
+                </button>
+            </template>
+        </div>
+
+        <!-- Floating Bubble Mode UI -->
+        <div x-show="mediaPlayerModal.minimized && mediaPlayerModal.bubbleMode"
+             class="w-full h-full flex items-center justify-center relative cursor-grab active:cursor-grabbing"
+             @click="if (!mediaPlayerModal.isDragging) { mediaPlayerModal.bubbleMode = false; }"
+             @mousedown="startDrag($event)"
+             @touchstart="startDrag($event)">
+             
+             <!-- CD/Vinyl artwork spinning if audio, or film icon if video -->
+             <div class="relative w-12 h-12 rounded-full overflow-hidden border border-white/10 bg-slate-900 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-105">
+                 <template x-if="mediaPlayerModal.isAudio">
+                     <!-- Spinning CD -->
+                     <div class="w-full h-full relative flex items-center justify-center">
+                         <template x-if="mediaPlayerModal.file?.has_thumb">
+                             <img :src="mediaPlayerModal.file?.id ? `/api/files/${mediaPlayerModal.file.id}/thumb` : ''"
+                                  class="w-full h-full object-cover animate-[spin_20s_linear_infinite]"
+                                  :style="mediaPlayerModal.isPlaying ? 'animation-play-state: running' : 'animation-play-state: paused'">
+                         </template>
+                         <template x-if="!mediaPlayerModal.file?.has_thumb">
+                             <div class="w-full h-full flex items-center justify-center bg-slate-950 animate-[spin_20s_linear_infinite]"
+                                  :style="mediaPlayerModal.isPlaying ? 'animation-play-state: running' : 'animation-play-state: paused'">
+                                 <i class="fa-solid fa-compact-disc text-amber-500/80 text-xl"></i>
+                             </div>
+                         </template>
+                         <!-- Center spindle hole -->
+                         <div class="absolute inset-0 m-auto w-2 h-2 rounded-full bg-slate-950 border border-slate-900 flex items-center justify-center z-20">
+                             <div class="w-0.5 h-0.5 rounded-full bg-slate-800"></div>
+                         </div>
+                     </div>
+                 </template>
+                 <template x-if="!mediaPlayerModal.isAudio">
+                     <!-- Film / Video Icon -->
+                     <div class="w-full h-full flex items-center justify-center bg-slate-950 relative">
+                         <!-- Pulsing ring if playing -->
+                         <div x-show="mediaPlayerModal.isPlaying" class="absolute inset-0 rounded-full border border-purple-500 animate-ping opacity-60"></div>
+                         <i class="fa-solid fa-film text-purple-500/90 text-lg"></i>
+                     </div>
+                 </template>
+             </div>
+             
+             <!-- Badge/Indicator for playing state -->
+             <div class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] border border-slate-950 shadow"
+                  :class="mediaPlayerModal.isPlaying ? 'bg-green-500 animate-pulse' : 'bg-slate-500'">
+                  <i class="fa-solid" :class="mediaPlayerModal.isPlaying ? 'fa-play text-[5px] text-white pl-[1px]' : 'fa-pause text-[5px] text-white'"></i>
+             </div>
         </div>
     </div>
 
@@ -4824,6 +5103,140 @@
                 <i class="fa-solid fa-chevron-right"></i>
             </button>
         </footer>
+    </div>
+
+    <!-- ===== Visual Folder Selector Modal ===== -->
+    <div x-show="folderPicker.show" x-cloak
+        class="fixed inset-0 z-[220] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto"
+        x-transition.opacity>
+        <div @click.outside="folderPicker.show = false; clipboard = { action: null, ids: [] }"
+            class="glass-menu w-[95%] max-w-lg max-h-[75dvh] rounded-[2rem] p-6 shadow-2xl animate-modal-in border border-white/20 flex flex-col overflow-hidden">
+            
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-4 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                        <i class="fa-solid fa-folder-tree text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white" x-text="t('folder_picker_title')"></h3>
+                        <p class="text-xs text-slate-500 font-medium" x-html="t('pasting_items', {n: clipboard.ids.length, a: (clipboard.action === 'move' ? t('move') : t('copy'))})"></p>
+                    </div>
+                </div>
+                <button @click="folderPicker.show = false; clipboard = { action: null, ids: [] }"
+                    class="text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 p-1.5 rounded-full transition-colors shrink-0">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Path Breadcrumbs -->
+            <div class="mb-4 flex items-center gap-1.5 overflow-x-auto py-1.5 px-3 rounded-xl bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-700/30 text-xs shrink-0 scrollbar-none font-medium">
+                <button @click="navigateFolderPickerToRoot()" class="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1">
+                    <i class="fa-solid fa-house text-[10px]"></i>
+                    <span x-text="t('home')"></span>
+                </button>
+                <template x-for="(crumb, idx) in getFolderPickerBreadcrumbs()" :key="idx">
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <i class="fa-solid fa-chevron-right text-[8px] text-slate-350 dark:text-slate-600"></i>
+                        <button @click="navigateFolderPickerIndex(idx)" class="text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 font-semibold transition-colors" x-text="crumb"></button>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Folder Search & Action Bar -->
+            <div class="mb-4 shrink-0 flex gap-2">
+                <div class="relative group flex-1">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <i class="fa-solid fa-magnifying-glass text-xs text-slate-400 group-focus-within:text-blue-500 transition-colors"></i>
+                    </div>
+                    <input type="text" x-model="folderPicker.searchQuery"
+                        :placeholder="t('search_placeholder')"
+                        class="w-full pl-9 pr-3 py-2 rounded-xl bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-slate-800 dark:text-slate-200 transition-all text-xs shadow-sm">
+                </div>
+                <!-- Create Folder toggler -->
+                <button @click="folderPicker.showNewFolderInput = !folderPicker.showNewFolderInput; if(folderPicker.showNewFolderInput) { setTimeout(() => $refs.pickerNewFolderInput?.focus(), 150) }"
+                    class="px-3 py-2 bg-slate-105 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-750 dark:text-slate-250 border border-slate-200/80 dark:border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95">
+                    <i class="fa-solid fa-folder-plus text-sm"></i>
+                    <span class="hidden sm:inline" x-text="t('new_folder')"></span>
+                </button>
+            </div>
+
+            <!-- New Folder Input form inside Modal -->
+            <div x-show="folderPicker.showNewFolderInput"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-2"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                class="mb-4 p-3 rounded-xl bg-blue-50/30 dark:bg-blue-950/10 border border-blue-105/50 dark:border-blue-800/10 shrink-0 flex gap-2 items-center">
+                <input type="text" x-model="folderPicker.newFolderName" x-ref="pickerNewFolderInput"
+                    :placeholder="t('new_folder_placeholder') || 'Tên thư mục mới...'"
+                    @keydown.enter="createFolderInPicker()"
+                    class="flex-1 px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-750 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs text-slate-800 dark:text-slate-200">
+                <button @click="createFolderInPicker()"
+                    class="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-blue-500/15 active:scale-95">
+                    <span x-text="t('confirm')"></span>
+                </button>
+                <button @click="folderPicker.showNewFolderInput = false; folderPicker.newFolderName = ''"
+                    class="p-2 text-slate-455 hover:text-slate-655 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Folder List (Scrollable) -->
+            <div class="flex-1 overflow-y-auto pr-1 -mr-2 min-h-[20vh] max-h-[35vh] space-y-1">
+                <!-- Loader -->
+                <div x-show="folderPicker.isLoading" class="w-full py-12 flex flex-col items-center justify-center">
+                    <i class="fa-solid fa-circle-notch fa-spin text-2xl text-blue-500 mb-2"></i>
+                    <p class="text-xs text-slate-500" x-text="t('loading')"></p>
+                </div>
+
+                <!-- Folder items -->
+                <div x-show="!folderPicker.isLoading">
+                    <!-- Nav to parent (if not root) -->
+                    <template x-if="folderPicker.currentPath !== '/'">
+                        <div @click="const parts = getFolderPickerBreadcrumbs(); navigateFolderPickerIndex(parts.length - 2)"
+                            class="group p-2.5 rounded-xl hover:bg-slate-100/50 dark:hover:bg-slate-800/40 cursor-pointer flex items-center gap-3 transition-colors text-xs text-slate-500 hover:text-blue-500 font-semibold border border-transparent">
+                            <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 shadow-sm">
+                                <i class="fa-solid fa-arrow-up-from-bracket rotate-270 text-slate-400 group-hover:text-blue-500 transition-colors"></i>
+                            </div>
+                            <span>.. (Thư mục cha)</span>
+                        </div>
+                    </template>
+
+                    <template x-for="folder in filteredFolderPickerFolders" :key="folder.id">
+                        <div @click="navigateFolderPicker(folder.filename)"
+                            class="group p-2.5 rounded-xl hover:bg-white/50 dark:hover:bg-slate-800/40 border border-transparent hover:border-slate-200/50 dark:hover:border-slate-700/30 cursor-pointer flex items-center justify-between gap-3 transition-all">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center shrink-0 shadow-sm">
+                                    <i class="fa-solid fa-folder text-amber-400 text-lg drop-shadow-sm group-hover:scale-105 transition-transform"></i>
+                                </div>
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-200 truncate" x-text="folder.filename"></span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-[10px] text-slate-350 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all"></i>
+                        </div>
+                    </template>
+
+                    <!-- Empty state -->
+                    <template x-if="filteredFolderPickerFolders.length === 0">
+                        <div class="py-8 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                            <i class="fa-solid fa-folder-open text-3xl mb-2"></i>
+                            <p class="text-xs font-medium text-center px-4" x-text="folderPicker.searchQuery ? t('no_results') + ' &quot;' + folderPicker.searchQuery + '&quot;' : (folderPicker.hasFilesOnly ? t('no_subfolders') : t('empty_folder'))"></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Footer / Confirm Actions -->
+            <div class="mt-5 pt-4 border-t border-slate-200/50 dark:border-slate-700/50 flex gap-3 shrink-0">
+                <button @click="folderPicker.show = false; clipboard = { action: null, ids: [] }"
+                    class="flex-1 py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 font-semibold transition-all text-xs text-center active:scale-95"
+                    x-text="t('cancel')"></button>
+                <button @click="executePasteToSelected()"
+                    class="flex-1 py-2.5 px-4 rounded-xl text-white font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-500/25 transition-all text-xs text-center active:scale-95 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    <span x-text="clipboard.action === 'move' ? t('move') + ' ' + t('paste_here') : t('copy') + ' ' + t('paste_here')"></span>
+                </button>
+            </div>
+        </div>
     </div>
 </body>
 

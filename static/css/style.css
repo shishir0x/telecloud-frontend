@@ -784,20 +784,50 @@ body.art-fullscreen-active {
 
 /* Volume Slider Customizations */
 .art-volume-slider {
-    background: var(--border-light) !important;
+    background: var(--border-main) !important;
     border-radius: 10px !important;
-    height: 4px !important;
+    height: 80px !important;
+    width: 4px !important;
+    margin: 0 auto !important;
 }
 
-.art-volume-slider-handle {
+.art-volume-indicator {
     background: var(--accent-color) !important;
-    width: 10px !important;
-    height: 10px !important;
+    width: 4px !important;
+    border-radius: 10px !important;
+}
+
+.art-volume-handle {
+    background: var(--accent-color) !important;
+    width: 12px !important;
+    height: 12px !important;
     border-radius: 50% !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
     box-shadow: 0 0 6px var(--accent-glow) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.art-volume-val {
+    color: var(--text-primary) !important;
+    font-size: 11px !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    margin-bottom: 6px !important;
 }
 
 /* Settings, Selectors, Info and Volume Popups */
+.art-settings,
+.art-setting,
+.art-selector,
+.art-selector-list {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0.75rem !important;
+    overflow: hidden !important;
+}
+
 .art-setting-panel,
 .art-selector-list,
 .art-info,
@@ -843,9 +873,29 @@ body.art-fullscreen-active {
     background: rgba(255, 255, 255, 0.1) !important;
 }
 
+/* Ensure setting child text/arrows inherit color correctly to be visible in light mode */
+.art-setting-item-left,
+.art-setting-item-right,
+.art-setting-item-right-icon,
+.art-setting-item-left-icon,
+.art-setting-item-left-text,
+.art-setting-item-right-tooltip,
+.art-selector-item-left,
+.art-selector-item-right {
+    color: inherit !important;
+}
+
+/* Force setting icons and SVGs to inherit colors and use currentColor fill to resolve white icons visibility issues */
 .art-setting-item-left-icon i,
-.art-setting-item-left-icon svg {
-    color: var(--accent-color) !important;
+.art-setting-item-left-icon svg,
+.art-setting-item-right-icon i,
+.art-setting-item-right-icon svg,
+.art-selector-item-left i,
+.art-selector-item-left svg,
+.art-setting-item svg,
+.art-selector-item svg {
+    color: inherit !important;
+    fill: currentColor !important;
 }
 
 /* Tooltips */
@@ -887,21 +937,34 @@ body.art-fullscreen-active {
     background: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Subtitles Netflix-like capsule style */
+/* Subtitles default capsule style */
 .art-video-player .art-subtitle {
     font-family: 'Nunito', sans-serif !important;
-    font-size: 1.25rem !important;
-    background: rgba(15, 23, 42, 0.7) !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    font-size: var(--art-subtitle-font-size, 1.25rem) !important;
+    background: var(--art-subtitle-bg, rgba(15, 23, 42, 0.7)) !important;
+    backdrop-filter: var(--art-subtitle-backdrop-filter, blur(8px)) !important;
+    -webkit-backdrop-filter: var(--art-subtitle-backdrop-filter, blur(8px)) !important;
+    border: var(--art-subtitle-border, 1px solid rgba(255, 255, 255, 0.15)) !important;
     border-radius: 0.5rem !important;
     padding: 6px 16px !important;
-    text-shadow: none !important;
+    text-shadow: var(--art-subtitle-text-shadow, none) !important;
     line-height: 1.4 !important;
-    bottom: 50px !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
-    color: #ffffff !important;
+    bottom: 40px !important;
+    box-shadow: var(--art-subtitle-box-shadow, 0 4px 15px rgba(0, 0, 0, 0.3)) !important;
+    color: var(--art-subtitle-color, #ffffff) !important;
+    transition: bottom 0.25s ease !important;
+    
+    /* Center and shrink-to-fit background */
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: max-content !important;
+    max-width: 85% !important;
+    text-align: center !important;
+}
+
+/* Push up when controls are visible (active hover) */
+.art-video-player.art-hover .art-subtitle {
+    bottom: 90px !important;
 }
 
 .art-video-player .art-subtitle:empty {
@@ -1390,4 +1453,40 @@ img.comic-img-ready {
 .immersive-player-modal.media-player-minimized:hover {
     border-color: var(--accent-color) !important;
     box-shadow: 0 10px 30px var(--accent-glow) !important;
+}
+
+/* Minimized Compact Playlist overrides for light/dark theme integration */
+.immersive-player-modal .miniplayer-playlist {
+    background: var(--bg-panel) !important;
+    border-top: 1px solid var(--border-light) !important;
+}
+
+.immersive-player-modal .miniplayer-playlist-item {
+    border-bottom: 1px solid var(--border-light) !important;
+    color: var(--text-primary) !important;
+}
+
+.immersive-player-modal .miniplayer-playlist-item:hover {
+    background: var(--bg-surface) !important;
+}
+
+/* Active track in minimized playlist */
+.immersive-player-modal .miniplayer-playlist-item.active-mini-track {
+    background: rgba(59, 130, 246, 0.15) !important;
+    color: var(--accent-color) !important;
+    border-left: 2px solid var(--accent-color) !important;
+}
+
+.immersive-player-modal .miniplayer-playlist-item span.text-slate-500 {
+    color: var(--text-secondary) !important;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+    20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+    animation: shake 0.4s ease-in-out;
 }

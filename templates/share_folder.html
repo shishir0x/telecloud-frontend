@@ -116,11 +116,11 @@
     </div>
 
     <div x-show="fileInfoModal.show" x-cloak
-        class="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+        class="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto"
         x-transition.opacity>
         <div @click.outside="closeFileInfoModal()"
-            class="glass-menu w-[90%] max-h-[90vh] rounded-[2rem] shadow-2xl animate-modal-in border border-white/20 transition-all duration-300 flex flex-col overflow-hidden"
-            :class="fileInfoModal.isLarge ? (fileInfoModal.isMedia ? 'md:max-w-lg max-w-sm' : 'modal-wide') : 'max-w-sm'">
+            class="glass-menu w-[90%] max-h-[85dvh] md:max-h-[90vh] rounded-[2rem] shadow-2xl animate-modal-in border border-white/20 transition-all duration-300 flex flex-col overflow-hidden"
+            :class="(fileInfoModal.isLarge && !fileInfoModal.needsLoad && !fileInfoModal.isPreviewLoading && (!fileInfoModal.tooLarge || fileInfoModal.bypassWarning)) ? (fileInfoModal.isMedia ? 'md:max-w-lg max-w-sm' : 'modal-wide') : 'max-w-sm'">
 
             <!-- Non-scrolling Opaque Header -->
             <div
@@ -320,6 +320,10 @@
                     <button @click="startDownload(fileInfoModal.file?.id); closeFileInfoModal()"
                         class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-lg shadow-blue-500/25 transition-transform active:scale-95">
                         <i class="fa-solid fa-download"></i> <span x-text="t('download')"></span>
+                    </button>
+                    <button @click="closeFileInfoModal()"
+                        class="w-full mt-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium transition-all text-xs">
+                        <span x-text="t('close')"></span>
                     </button>
                 </div>
             </div> <!-- Closes Scrollable Content -->
@@ -948,7 +952,9 @@
     <!-- ==================== IMMERSIVE MEDIA PLAYER MODAL (Cinema Mode) ==================== -->
     <div x-show="mediaPlayerModal.show" x-cloak
         :class="mediaPlayerModal.minimized 
-            ? 'media-player-minimized immersive-player-modal fixed bottom-6 right-6 z-[600] w-[340px] md:w-[380px] rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-purple-500/30 shadow-2xl select-none flex flex-col overflow-hidden transition-all duration-300 pointer-events-auto hover:border-purple-500/50 hover:shadow-purple-500/10' 
+            ? (mediaPlayerModal.bubbleMode
+                ? 'media-player-minimized immersive-player-modal fixed bottom-6 right-4 md:right-6 z-[600] w-14 h-14 rounded-full bg-slate-950/95 border border-purple-500/40 shadow-2xl select-none flex items-center justify-center transition-all duration-300 pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-105 hover:border-purple-500/60 shadow-purple-500/10'
+                : 'media-player-minimized immersive-player-modal fixed bottom-6 right-4 md:right-6 z-[600] w-[calc(100%-2rem)] max-w-[340px] md:w-[380px] rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-purple-500/30 shadow-2xl select-none flex flex-col overflow-hidden transition-all duration-300 pointer-events-auto hover:border-purple-500/50 hover:shadow-purple-500/10')
             : 'immersive-player-modal fixed inset-0 z-[600] flex flex-col bg-slate-950/98 backdrop-blur-xl select-none transition-all duration-300'"
         :style="mediaPlayerModal.minimized && mediaPlayerModal.x !== null ? 'left: ' + mediaPlayerModal.x + 'px; top: ' + mediaPlayerModal.y + 'px; bottom: auto; right: auto;' : ''"
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
@@ -960,7 +966,8 @@
         <div x-show="!mediaPlayerModal.minimized" class="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-black/40 pointer-events-none"></div>
 
         <!-- Top Header Panel (Glassmorphism) -->
-        <header @mousedown="startDrag($event)" @touchstart="startDrag($event)"
+        <header x-show="!mediaPlayerModal.minimized || !mediaPlayerModal.bubbleMode"
+            @mousedown="startDrag($event)" @touchstart="startDrag($event)"
             :class="mediaPlayerModal.minimized ? 'relative z-20 flex items-center justify-between p-3 bg-slate-900/60 backdrop-blur-md border-b border-white/5 shadow-md gap-4 cursor-grab active:cursor-grabbing' : 'relative z-20 flex items-center justify-between p-4 bg-slate-900/40 backdrop-blur-md border-b border-white/5 shadow-lg gap-4'">
             <div class="flex items-center gap-3 min-w-0">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
@@ -986,12 +993,19 @@
                     :title="t('next_track_tooltip')">
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
-                <!-- Playlist Sidebar Toggle Button (when NOT minimized) -->
-                <button x-show="!mediaPlayerModal.minimized" @click="mediaPlayerModal.playlistOpen = !mediaPlayerModal.playlistOpen"
+                <!-- Playlist Sidebar Toggle Button -->
+                <button @click="mediaPlayerModal.playlistOpen = !mediaPlayerModal.playlistOpen"
                     class="p-2 rounded-full transition-colors shrink-0"
                     :class="mediaPlayerModal.playlistOpen ? 'text-amber-400 bg-white/15' : 'text-slate-400 hover:text-white hover:bg-white/10'"
                     :title="t('playlist_tooltip')">
                     <i class="fa-solid fa-list"></i>
+                </button>
+
+                <!-- Collapse to Bubble Button (only when minimized) -->
+                <button x-show="mediaPlayerModal.minimized" @click="mediaPlayerModal.bubbleMode = true"
+                    class="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
+                    :title="t('bubble_mode_tooltip') || 'Bubble Mode'">
+                    <i class="fa-regular fa-circle text-xs"></i>
                 </button>
 
                 <!-- Minimize/Restore Button (always visible) -->
@@ -1000,6 +1014,9 @@
                     :title="mediaPlayerModal.minimized ? t('maximize') : t('minimize')">
                     <i class="fa-solid" :class="mediaPlayerModal.minimized ? 'fa-expand' : 'fa-compress'"></i>
                 </button>
+
+
+
                 <!-- Close Button (only visible when minimized) -->
                 <button x-show="mediaPlayerModal.minimized" @click="closeMediaPlayerModal()"
                     class="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
@@ -1010,7 +1027,8 @@
         </header>
 
         <!-- Media Player Stage -->
-        <div :class="mediaPlayerModal.minimized ? 'p-0 flex-none' : 'flex-1 flex items-stretch p-0 relative z-10 overflow-hidden h-[calc(100%-64px)] md:h-[calc(100%-68px)]'">
+        <div x-show="!mediaPlayerModal.minimized || !mediaPlayerModal.bubbleMode"
+            :class="mediaPlayerModal.minimized ? 'p-0 flex-none' : 'flex-1 flex items-stretch p-0 relative z-10 overflow-hidden h-[calc(100%-64px)] md:h-[calc(100%-68px)]'">
             <!-- Left Media Container (flexible, scroll/stretch-friendly) -->
             <div :class="mediaPlayerModal.minimized ? 'w-full' : 'flex-1 flex items-center justify-center p-4 min-w-0 overflow-y-auto'">
                 <!-- Video Player (16:9 Aspect ratio) -->
@@ -1119,6 +1137,76 @@
                     </template>
                 </div>
             </div>
+        </div>
+
+        <!-- Compact Playlist for Minimized Player (Miniplayer) -->
+        <div x-show="mediaPlayerModal.minimized && mediaPlayerModal.playlistOpen && !mediaPlayerModal.bubbleMode"
+             class="miniplayer-playlist border-t border-white/5 bg-slate-950/80 backdrop-blur-md flex flex-col max-h-[160px] overflow-y-auto custom-scrollbar shrink-0"
+             x-effect="if (mediaPlayerModal.minimized && mediaPlayerModal.playlistOpen && mediaPlayerModal.playlistIndex !== -1) {
+                 $nextTick(() => {
+                     const activeEl = $el.querySelector('.active-mini-track');
+                     if (activeEl) {
+                         activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                     }
+                 });
+             }">
+            <template x-for="(f, index) in mediaPlayerModal.playlist" :key="f.id">
+                <button @click="playTrackByIndex(index)"
+                    class="miniplayer-playlist-item w-full flex items-center gap-2.5 p-2 transition-all text-left text-[11px] outline-none border-b border-white/5 last:border-b-0"
+                    :class="index === mediaPlayerModal.playlistIndex 
+                        ? 'bg-blue-600/20 text-blue-400 font-bold border-l-2 border-blue-500 active-mini-track' 
+                        : 'text-slate-300 hover:bg-white/5'">
+                    <i class="fa-solid shrink-0" :class="['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus', 'oga', 'aac', 'm4b'].includes(f.filename.split('.').pop().toLowerCase()) ? 'fa-music text-amber-500/80' : 'fa-film text-purple-500/80'"></i>
+                    <span class="truncate flex-1" x-text="f.filename"></span>
+                    <span class="text-[9px] text-slate-500 shrink-0" x-text="formatBytes(f.size)"></span>
+                </button>
+            </template>
+        </div>
+
+        <!-- Floating Bubble Mode UI -->
+        <div x-show="mediaPlayerModal.minimized && mediaPlayerModal.bubbleMode"
+             class="w-full h-full flex items-center justify-center relative cursor-grab active:cursor-grabbing"
+             @click="if (!mediaPlayerModal.isDragging) { mediaPlayerModal.bubbleMode = false; }"
+             @mousedown="startDrag($event)"
+             @touchstart="startDrag($event)">
+             
+             <!-- CD/Vinyl artwork spinning if audio, or film icon if video -->
+             <div class="relative w-12 h-12 rounded-full overflow-hidden border border-white/10 bg-slate-900 flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-105">
+                 <template x-if="mediaPlayerModal.isAudio">
+                     <!-- Spinning CD -->
+                     <div class="w-full h-full relative flex items-center justify-center">
+                         <template x-if="mediaPlayerModal.file?.has_thumb">
+                             <img :src="mediaPlayerModal.file?.id ? '/s/' + shareToken + '/file/' + mediaPlayerModal.file.id + '/thumb' : ''"
+                                  class="w-full h-full object-cover animate-[spin_20s_linear_infinite]"
+                                  :style="mediaPlayerModal.isPlaying ? 'animation-play-state: running' : 'animation-play-state: paused'">
+                         </template>
+                         <template x-if="!mediaPlayerModal.file?.has_thumb">
+                             <div class="w-full h-full flex items-center justify-center bg-slate-950 animate-[spin_20s_linear_infinite]"
+                                  :style="mediaPlayerModal.isPlaying ? 'animation-play-state: running' : 'animation-play-state: paused'">
+                                 <i class="fa-solid fa-compact-disc text-amber-500/80 text-xl"></i>
+                             </div>
+                         </template>
+                         <!-- Center spindle hole -->
+                         <div class="absolute inset-0 m-auto w-2 h-2 rounded-full bg-slate-950 border border-slate-900 flex items-center justify-center z-20">
+                             <div class="w-0.5 h-0.5 rounded-full bg-slate-800"></div>
+                         </div>
+                     </div>
+                 </template>
+                 <template x-if="!mediaPlayerModal.isAudio">
+                     <!-- Film / Video Icon -->
+                     <div class="w-full h-full flex items-center justify-center bg-slate-950 relative">
+                         <!-- Pulsing ring if playing -->
+                         <div x-show="mediaPlayerModal.isPlaying" class="absolute inset-0 rounded-full border border-purple-500 animate-ping opacity-60"></div>
+                         <i class="fa-solid fa-film text-purple-500/90 text-lg"></i>
+                     </div>
+                 </template>
+             </div>
+             
+             <!-- Badge/Indicator for playing state -->
+             <div class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] border border-slate-950 shadow"
+                  :class="mediaPlayerModal.isPlaying ? 'bg-green-500 animate-pulse' : 'bg-slate-500'">
+                  <i class="fa-solid" :class="mediaPlayerModal.isPlaying ? 'fa-play text-[5px] text-white pl-[1px]' : 'fa-pause text-[5px] text-white'"></i>
+             </div>
         </div>
     </div>
 

@@ -186,6 +186,116 @@ function buildArtplayerSubtitleSetting(videoFilename, filesList, isShare, shareT
     };
 }
 
+function applySubtitleStyles(player) {
+    if (!player) return;
+    const container = player.template?.$player || 
+                      (typeof player.container === 'string' ? document.querySelector(player.container) : player.container);
+    if (!container || !container.style) return;
+
+    let bgStyle = localStorage.getItem('art-subtitle-bg-style') || 'default';
+    if (bgStyle === 'netflix') bgStyle = 'default';
+    const textColor = localStorage.getItem('art-subtitle-color') || '#ffffff';
+    const fontSize = localStorage.getItem('art-subtitle-font-size') || '1.25rem';
+
+    // Background Style
+    if (bgStyle === 'default') {
+        container.style.setProperty('--art-subtitle-bg', 'rgba(15, 23, 42, 0.7)');
+        container.style.setProperty('--art-subtitle-backdrop-filter', 'blur(8px)');
+        container.style.setProperty('--art-subtitle-border', '1px solid rgba(255, 255, 255, 0.15)');
+        container.style.setProperty('--art-subtitle-box-shadow', '0 4px 15px rgba(0, 0, 0, 0.3)');
+        container.style.setProperty('--art-subtitle-text-shadow', 'none');
+    } else if (bgStyle === 'semi-transparent') {
+        container.style.setProperty('--art-subtitle-bg', 'rgba(0, 0, 0, 0.5)');
+        container.style.setProperty('--art-subtitle-backdrop-filter', 'none');
+        container.style.setProperty('--art-subtitle-border', 'none');
+        container.style.setProperty('--art-subtitle-box-shadow', 'none');
+        container.style.setProperty('--art-subtitle-text-shadow', 'none');
+    } else if (bgStyle === 'solid') {
+        container.style.setProperty('--art-subtitle-bg', 'rgba(0, 0, 0, 1)');
+        container.style.setProperty('--art-subtitle-backdrop-filter', 'none');
+        container.style.setProperty('--art-subtitle-border', 'none');
+        container.style.setProperty('--art-subtitle-box-shadow', 'none');
+        container.style.setProperty('--art-subtitle-text-shadow', 'none');
+    } else if (bgStyle === 'transparent') {
+        container.style.setProperty('--art-subtitle-bg', 'transparent');
+        container.style.setProperty('--art-subtitle-backdrop-filter', 'none');
+        container.style.setProperty('--art-subtitle-border', 'none');
+        container.style.setProperty('--art-subtitle-box-shadow', 'none');
+        container.style.setProperty('--art-subtitle-text-shadow', '0 0 4px #000, 0 0 4px #000, 0 0 4px #000');
+    }
+
+    // Text Color
+    container.style.setProperty('--art-subtitle-color', textColor);
+
+    // Font Size
+    container.style.setProperty('--art-subtitle-font-size', fontSize);
+}
+
+function buildSubtitleBackgroundSetting(tFunc) {
+    let current = localStorage.getItem('art-subtitle-bg-style') || 'default';
+    if (current === 'netflix') current = 'default';
+    const options = [
+        { html: tFunc ? tFunc('subtitle_bg_default') : 'Default', value: 'default', default: current === 'default' },
+        { html: tFunc ? tFunc('subtitle_bg_semi') : 'Semi-Transparent', value: 'semi-transparent', default: current === 'semi-transparent' },
+        { html: tFunc ? tFunc('subtitle_bg_solid') : 'Solid Black', value: 'solid', default: current === 'solid' },
+        { html: tFunc ? tFunc('subtitle_bg_transparent') : 'No Background', value: 'transparent', default: current === 'transparent' }
+    ];
+    return {
+        width: 220,
+        html: tFunc ? tFunc('subtitle_background') : 'Subtitle Background',
+        tooltip: options.find(o => o.value === current)?.html || 'Default',
+        selector: options,
+        onSelect: function (item) {
+            localStorage.setItem('art-subtitle-bg-style', item.value);
+            applySubtitleStyles(this);
+            return item.html;
+        }
+    };
+}
+
+function buildSubtitleSizeSetting(tFunc) {
+    const current = localStorage.getItem('art-subtitle-font-size') || '1.25rem';
+    const options = [
+        { html: '16px', value: '1rem', default: current === '1rem' || current === '16px' },
+        { html: '20px', value: '1.25rem', default: current === '1.25rem' || current === '20px' },
+        { html: '24px', value: '1.5rem', default: current === '1.5rem' || current === '24px' },
+        { html: '28px', value: '1.75rem', default: current === '1.75rem' || current === '28px' },
+        { html: '32px', value: '2rem', default: current === '2rem' || current === '32px' }
+    ];
+    return {
+        width: 220,
+        html: tFunc ? tFunc('subtitle_size') : 'Subtitle Size',
+        tooltip: options.find(o => o.value === current)?.html || '20px',
+        selector: options,
+        onSelect: function (item) {
+            localStorage.setItem('art-subtitle-font-size', item.value);
+            applySubtitleStyles(this);
+            return item.html;
+        }
+    };
+}
+
+function buildSubtitleColorSetting(tFunc) {
+    const current = localStorage.getItem('art-subtitle-color') || '#ffffff';
+    const options = [
+        { html: tFunc ? tFunc('color_white') : 'White', value: '#ffffff', default: current === '#ffffff' },
+        { html: tFunc ? tFunc('color_yellow') : 'Yellow', value: '#ffff00', default: current === '#ffff00' },
+        { html: tFunc ? tFunc('color_green') : 'Green', value: '#00ff00', default: current === '#00ff00' },
+        { html: tFunc ? tFunc('color_cyan') : 'Cyan', value: '#00ffff', default: current === '#00ffff' }
+    ];
+    return {
+        width: 200,
+        html: tFunc ? tFunc('subtitle_color') : 'Subtitle Color',
+        tooltip: options.find(o => o.value === current)?.html || 'White',
+        selector: options,
+        onSelect: function (item) {
+            localStorage.setItem('art-subtitle-color', item.value);
+            applySubtitleStyles(this);
+            return item.html;
+        }
+    };
+}
+
 window.registerComicLazyImage = function(el) {
     // Mark wrapper as loading immediately so shimmer shows
     const wrapper = el.parentElement;
@@ -304,6 +414,100 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         botUserSettingsLoading: false,
         botLoading: false,
         restartingApp: false,
+        childSuccessModal: {
+            show: false,
+            title: '',
+            username: '',
+            password: '',
+            showPassword: false,
+            copiedUsername: false,
+            copiedPassword: false,
+            copiedBoth: false
+        },
+        forceChangeModal: {
+            show: false,
+            isPasskey: false,
+            loading: false,
+            newPassword: '',
+            confirmPassword: '',
+            showNewPassword: false,
+            showConfirmPassword: false,
+            error: '',
+            persistent: true,
+            resolve: null
+        },
+        async copyTextToSystemClipboard(text, type) {
+            try {
+                await TeleCloud.copyToClipboard(text);
+                const msg = type === 'username' ? (this.t('username_copied') || 'Username copied!') : (this.t('password_copied') || 'Password copied!');
+                this.showToast(msg, 'success');
+                if (type === 'username') {
+                    this.childSuccessModal.copiedUsername = true;
+                    setTimeout(() => { this.childSuccessModal.copiedUsername = false; }, 2000);
+                } else if (type === 'password') {
+                    this.childSuccessModal.copiedPassword = true;
+                    setTimeout(() => { this.childSuccessModal.copiedPassword = false; }, 2000);
+                }
+            } catch (err) {
+                this.showToast('Failed to copy', 'error');
+            }
+        },
+        async copyCredentials() {
+            const text = `Username: ${this.childSuccessModal.username}\nPassword: ${this.childSuccessModal.password}`;
+            try {
+                await TeleCloud.copyToClipboard(text);
+                this.showToast(this.t('credentials_copied') || 'Username and Password copied!', 'success');
+                this.childSuccessModal.copiedBoth = true;
+                setTimeout(() => { this.childSuccessModal.copiedBoth = false; }, 2000);
+            } catch (err) {
+                this.showToast('Failed to copy', 'error');
+            }
+        },
+        async submitFirstTimePasswordChange() {
+            const newPass = this.forceChangeModal.newPassword;
+            const confirmPass = this.forceChangeModal.confirmPassword;
+            if (!newPass) {
+                this.forceChangeModal.error = this.t('enter_new_password') || 'Enter new password';
+                return;
+            }
+            if (newPass !== confirmPass) {
+                this.forceChangeModal.error = this.t('toast_pass_mismatch') || 'Passwords do not match!';
+                return;
+            }
+            this.forceChangeModal.loading = true;
+            this.forceChangeModal.error = '';
+            try {
+                let cfd = new FormData();
+                cfd.append('old_password', this.forceChangeModal.isPasskey ? "" : this.password);
+                cfd.append('new_password', newPass);
+                
+                let headers = { 'X-CSRF-Token': TeleCloud.getCsrfToken() };
+                if (!this.forceChangeModal.isPasskey) {
+                    headers['Authorization'] = 'Basic ' + btoa(this.username + ':' + this.password);
+                }
+                
+                let cres = await fetch('/api/settings/password', { 
+                    method: 'POST', 
+                    body: cfd, 
+                    headers: headers 
+                });
+                if (cres.ok) {
+                    this.showToast(this.t('toast_pass_changed'), 'success');
+                    this.password = newPass;
+                    this.forceChangeModal.show = false;
+                    if (this.forceChangeModal.resolve) {
+                        this.forceChangeModal.resolve(true);
+                    }
+                } else {
+                    const d = await cres.json();
+                    this.forceChangeModal.error = this.handleCommonError(d.error, 'status_error');
+                }
+            } catch (e) {
+                this.forceChangeModal.error = this.t('conn_error') || 'Connection error!';
+            } finally {
+                this.forceChangeModal.loading = false;
+            }
+        },
         addBotToken() {
             this.botTokens.push({ value: '', isSaved: false });
         },
@@ -1023,18 +1227,25 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         async createUser() {
             this.isCreatingUser = true;
             try {
+                let username = this.userForm.username;
                 let fd = new FormData();
-                fd.append('username', this.userForm.username);
+                fd.append('username', username);
                 const res = await fetch('/api/users', { method: 'POST', body: fd, headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() } });
                 if (res.ok) {
                     const data = await res.json();
                     this.userForm = { username: '' };
                     this.fetchUsers();
-                    // Show temp password in a modal so admin can copy it
-                    await this.customAlert(
-                        this.t('toast_user_created_title'),
-                        this.t('toast_user_created_msg', { p: data.temp_password || '' })
-                    );
+                    // Show temp password in the custom success modal
+                    this.childSuccessModal = {
+                        show: true,
+                        title: this.t('toast_user_created_title'),
+                        username: username,
+                        password: data.temp_password || '',
+                        showPassword: false,
+                        copiedUsername: false,
+                        copiedPassword: false,
+                        copiedBoth: false
+                    };
                 } else {
                     const data = await res.json();
                     this.showToast(this.handleCommonError(data.error, 'status_error'), 'error');
@@ -1067,11 +1278,17 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 const res = await fetch(`/api/users/${username}/reset-pass`, { method: 'POST', headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() } });
                 if (res.ok) {
                     const data = await res.json();
-                    // Show temp password in a modal so admin can copy it
-                    await this.customAlert(
-                        this.t('reset_password_confirm_title'),
-                        this.t('toast_password_reset_msg', { u: username, p: data.temp_password || '' })
-                    );
+                    // Show temp password in the custom success modal
+                    this.childSuccessModal = {
+                        show: true,
+                        title: this.t('reset_password_confirm_title'),
+                        username: username,
+                        password: data.temp_password || '',
+                        showPassword: false,
+                        copiedUsername: false,
+                        copiedPassword: false,
+                        copiedBoth: false
+                    };
                 } else {
                     this.showToast(this.t('status_error'), 'error');
                 }
@@ -1296,6 +1513,16 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         openMenuId: null,
         selectedIds: [], 
         clipboard: { action: null, ids: [] },
+        folderPicker: {
+            show: false,
+            currentPath: '/',
+            folders: [],
+            isLoading: false,
+            searchQuery: '',
+            newFolderName: '',
+            showNewFolderInput: false,
+            hasFilesOnly: false
+        },
         dragOver: false, 
         uploadModal: false,
         uploadDragOver: false,
@@ -1374,7 +1601,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
         pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
-        mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false },
+        mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false, bubbleMode: false, isDragging: false },
         modal: { show: false, type: 'alert', title: '', message: '', input: '', resolve: null, isDanger: false, inputType: 'text', applyToAll: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
         init() { 
@@ -1408,6 +1635,37 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     setTimeout(() => {
                         try { this.playerInstance.resize(); } catch(e){}
                     }, 350);
+                }
+            });
+
+            this.$watch('mediaPlayerModal.bubbleMode', value => {
+                if (!value && this.mediaPlayerModal.minimized) {
+                    if (this.mediaPlayerModal.x !== null && this.mediaPlayerModal.y !== null) {
+                        const screenWidth = window.innerWidth;
+                        const screenHeight = window.innerHeight;
+                        const cardWidth = screenWidth >= 768 ? 380 : Math.min(screenWidth - 32, 340);
+                        const cardHeight = this.mediaPlayerModal.playlistOpen ? 420 : 280;
+                        
+                        let newX = this.mediaPlayerModal.x;
+                        let newY = this.mediaPlayerModal.y;
+                        
+                        if (newX + cardWidth > screenWidth - 10) {
+                            newX = screenWidth - cardWidth - 10;
+                        }
+                        if (newX < 10) {
+                            newX = 10;
+                        }
+                        
+                        if (newY + cardHeight > screenHeight - 10) {
+                            newY = screenHeight - cardHeight - 10;
+                        }
+                        if (newY < 10) {
+                            newY = 10;
+                        }
+                        
+                        this.mediaPlayerModal.x = newX;
+                        this.mediaPlayerModal.y = newY;
+                    }
                 }
             });
 
@@ -1898,40 +2156,30 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 if (res.ok) {
                     const data = await res.json();
                     if (data.status === 'force_password_change') {
-                        await this.customAlert(this.t('force_password_change_title'), this.t('force_password_change_msg'));
-                        const newPass = await this.customPrompt(this.t('new_password'), "", "password");
-                        if (!newPass) return;
-                        const confirmPass = await this.customPrompt(this.t('confirm_password'), "", "password");
-                        if (newPass !== confirmPass) {
-                            this.showToast(this.t('toast_pass_mismatch'), 'error');
+                        this.forceChangeModal = {
+                            show: true,
+                            isPasskey: false,
+                            loading: false,
+                            newPassword: '',
+                            confirmPassword: '',
+                            showNewPassword: false,
+                            showConfirmPassword: false,
+                            error: '',
+                            persistent: true,
+                            resolve: null
+                        };
+                        
+                        const newPasswordChanged = await new Promise((resolve) => {
+                            this.forceChangeModal.resolve = resolve;
+                        });
+                        
+                        if (!newPasswordChanged) {
+                            this.isLoggingIn = false;
                             return;
                         }
                         
-                        // Call change password API
-                        let cfd = new FormData();
-                        cfd.append('old_password', this.password);
-                        cfd.append('new_password', newPass);
-                        let cres = await fetch('/api/settings/password', { 
-                            method: 'POST', 
-                            body: cfd, 
-                            headers: { 
-                                'X-CSRF-Token': TeleCloud.getCsrfToken(),
-                                // We need to pass the login credentials because we don't have a session yet
-                                'Authorization': 'Basic ' + btoa(this.username + ':' + this.password)
-                            } 
-                        });
-
-                        if (cres.ok) {
-                            this.showToast(this.t('toast_pass_changed'), 'success');
-                            // Update stored password to the new one so the next login() call succeeds
-                            this.password = newPass;
-                            // After change, log in again automatically to get a real session
-                            this.isLoggingIn = false; 
-                            return await this.login();
-                        } else {
-                            const d = await cres.json();
-                            this.showToast(this.handleCommonError(d.error, 'status_error'), 'error');
-                        }
+                        this.isLoggingIn = false; 
+                        return await this.login();
                     } else {
                         window.location.href = '/'; 
                     }
@@ -1986,24 +2234,26 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 const result = await finishResp.json();
                 if (result.status === 'force_password_change') {
                     this.isPasskeyLoading = false;
-                    await this.customAlert(this.t('force_password_change_title'), this.t('force_password_change_msg'));
-                    const newPass = await this.customPrompt(this.t('new_password'), "", "password");
-                    if (!newPass) return;
-                    const confirmPass = await this.customPrompt(this.t('confirm_password'), "", "password");
-                    if (newPass !== confirmPass) {
-                        this.showToast(this.t('toast_pass_mismatch'), 'error');
-                        return;
-                    }
-                    let cfd = new FormData();
-                    cfd.append('old_password', "");
-                    cfd.append('new_password', newPass);
-                    let cres = await fetch('/api/settings/password', { method: 'POST', body: cfd, headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() } });
-                    if (cres.ok) {
-                        this.showToast(this.t('toast_pass_changed'), 'success');
+                    
+                    this.forceChangeModal = {
+                        show: true,
+                        isPasskey: true,
+                        loading: false,
+                        newPassword: '',
+                        confirmPassword: '',
+                        showNewPassword: false,
+                        showConfirmPassword: false,
+                        error: '',
+                        persistent: true,
+                        resolve: null
+                    };
+                    
+                    const newPasswordChanged = await new Promise((resolve) => {
+                        this.forceChangeModal.resolve = resolve;
+                    });
+                    
+                    if (newPasswordChanged) {
                         window.location.href = '/';
-                    } else {
-                        const d = await cres.json();
-                        this.showToast(this.handleCommonError(d.error, 'status_error'), 'error');
                     }
                 } else if (result.status === 'success') {
                     window.location.href = '/';
@@ -2211,6 +2461,139 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             const response = await fetch('/api/actions/paste', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': TeleCloud.getCsrfToken() }, body: JSON.stringify({ action: this.clipboard.action, item_ids: this.clipboard.ids, destination: this.currentPath }) });
             if (response.ok) {
                 this.clipboard = { action: null, ids: [] }; 
+                this.fetchFiles(true);
+                this.showToast(this.t('toast_pasted'));
+            } else {
+                const data = await response.json();
+                this.showToast(this.handleCommonError(data.error, 'status_error'), 'error');
+                this.fetchFiles(true);
+            }
+        },
+        openFolderPicker() {
+            this.folderPicker.currentPath = this.currentPath;
+            this.folderPicker.searchQuery = '';
+            this.folderPicker.newFolderName = '';
+            this.folderPicker.showNewFolderInput = false;
+            this.folderPicker.hasFilesOnly = false;
+            this.folderPicker.show = true;
+            this.fetchFolderPickerFolders();
+        },
+        async fetchFolderPickerFolders() {
+            this.folderPicker.isLoading = true;
+            try {
+                const res = await fetch(`/api/files?path=${encodeURIComponent(this.folderPicker.currentPath)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.folderPicker.folders = (data.files || []).filter(f => f.is_folder && !f.deleted_at);
+                    this.folderPicker.hasFilesOnly = (data.files || []).length > 0 && this.folderPicker.folders.length === 0;
+                }
+            } catch (e) {
+                console.error('Error fetching folders for picker', e);
+            } finally {
+                this.folderPicker.isLoading = false;
+            }
+        },
+        navigateFolderPicker(folderName) {
+            const curr = this.folderPicker.currentPath;
+            this.folderPicker.currentPath = curr === '/' ? '/' + folderName : curr + '/' + folderName;
+            this.folderPicker.searchQuery = '';
+            this.folderPicker.newFolderName = '';
+            this.folderPicker.showNewFolderInput = false;
+            this.folderPicker.hasFilesOnly = false;
+            this.fetchFolderPickerFolders();
+        },
+        navigateFolderPickerIndex(index) {
+            const crumbs = this.getFolderPickerBreadcrumbs();
+            this.folderPicker.currentPath = '/' + crumbs.slice(0, index + 1).join('/');
+            this.folderPicker.searchQuery = '';
+            this.folderPicker.newFolderName = '';
+            this.folderPicker.showNewFolderInput = false;
+            this.folderPicker.hasFilesOnly = false;
+            this.fetchFolderPickerFolders();
+        },
+        navigateFolderPickerToRoot() {
+            this.folderPicker.currentPath = '/';
+            this.folderPicker.searchQuery = '';
+            this.folderPicker.newFolderName = '';
+            this.folderPicker.showNewFolderInput = false;
+            this.folderPicker.hasFilesOnly = false;
+            this.fetchFolderPickerFolders();
+        },
+        getFolderPickerBreadcrumbs() {
+            return this.folderPicker.currentPath === '/' ? [] : this.folderPicker.currentPath.split('/').filter(Boolean);
+        },
+        get filteredFolderPickerFolders() {
+            if (!this.folderPicker.searchQuery) return this.folderPicker.folders;
+            const q = this.folderPicker.searchQuery.toLowerCase();
+            return this.folderPicker.folders.filter(f => f.filename.toLowerCase().includes(q));
+        },
+        async createFolderInPicker() {
+            const name = this.folderPicker.newFolderName.trim();
+            if (!name) return;
+            try {
+                const fd = new FormData();
+                fd.append('name', name);
+                fd.append('path', this.folderPicker.currentPath);
+                const response = await fetch('/api/folders', {
+                    method: 'POST',
+                    body: fd,
+                    headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() }
+                });
+                if (response.ok) {
+                    this.showToast(this.t('toast_created', {n: name}));
+                    this.folderPicker.newFolderName = '';
+                    this.folderPicker.showNewFolderInput = false;
+                    this.folderPicker.hasFilesOnly = false;
+                    this.fetchFolderPickerFolders();
+                } else {
+                    const data = await response.json();
+                    this.showToast(this.handleCommonError(data.error, 'status_error'), 'error');
+                }
+            } catch (e) {
+                this.showToast(this.t('conn_error'), 'error');
+            }
+        },
+        async executePasteToSelected() {
+            if (this.clipboard.ids.length === 0) return;
+            const dest = this.folderPicker.currentPath;
+
+            if (this.clipboard.action === 'move') {
+                const conflicts = this.clipboard.ids.some(id => {
+                    const file = this.files.find(f => f.id === id) || this.folderPicker.folders.find(f => f.id === id);
+                    if (file && file.is_folder) {
+                        const prefix = file.path === '/' ? '/' + file.filename : file.path + '/' + file.filename;
+                        return dest === prefix || dest.startsWith(prefix + '/');
+                    }
+                    return false;
+                });
+                if (conflicts) {
+                    this.showToast(this.t('err_move_loop') || 'Cannot move folder inside itself or its children', 'error');
+                    return;
+                }
+            }
+
+            if (this.clipboard.action === 'move') {
+                // Optimistically remove moved files from view if pasted away from current path
+                if (dest !== this.currentPath) {
+                    this.files = this.files.filter(f => !this.clipboard.ids.includes(f.id));
+                }
+            }
+
+            const response = await fetch('/api/actions/paste', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': TeleCloud.getCsrfToken()
+                },
+                body: JSON.stringify({
+                    action: this.clipboard.action,
+                    item_ids: this.clipboard.ids,
+                    destination: dest
+                })
+            });
+            if (response.ok) {
+                this.clipboard = { action: null, ids: [] };
+                this.folderPicker.show = false;
                 this.fetchFiles(true);
                 this.showToast(this.t('toast_pasted'));
             } else {
@@ -3240,6 +3623,34 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 this.fetchFiles(true);
             }
         },
+        async regenerateThumb(id) {
+            this.showToast(this.t('toast_regenerating_cover'), 'info', 0);
+            try {
+                const response = await fetch(`/api/files/${id}/regenerate-thumb`, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() }
+                });
+                if (response.ok) {
+                    this.showToast(this.t('toast_regenerate_cover_success'), 'success');
+                    this.fetchFiles(true);
+                } else {
+                    const data = await response.json();
+                    this.showToast(this.handleCommonError(data.error, 'toast_regenerate_cover_failed'), 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                this.showToast(this.t('toast_regenerate_cover_failed'), 'error');
+            }
+        },
+        supportsThumbnail(file) {
+            if (!file || file.is_folder) return false;
+            const mime = file.mime_type || '';
+            if (mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/')) {
+                return true;
+            }
+            const ext = (file.filename || '').split('.').pop().toLowerCase();
+            return ['epub', 'cbz'].includes(ext);
+        },
         async renameFile(file) { 
             const newName = await this.customPrompt(this.t('rename_title'), file.filename); 
             if (!newName || newName === file.filename) return; 
@@ -3288,7 +3699,9 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 y: null,
                 playlist: [],
                 playlistIndex: -1,
-                playlistOpen: false
+                playlistOpen: false,
+                bubbleMode: false,
+                isDragging: false
             };
             this.initPlaylist(file);
             
@@ -3371,7 +3784,10 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                             escape: false,
                         },
                         settings: [
-                            buildArtplayerSubtitleSetting(file.filename, this.files || [], false, '', (k) => this.t(k))
+                            buildArtplayerSubtitleSetting(file.filename, this.files || [], false, '', (k) => this.t(k)),
+                            buildSubtitleBackgroundSetting((k) => this.t(k)),
+                            buildSubtitleSizeSetting((k) => this.t(k)),
+                            buildSubtitleColorSetting((k) => this.t(k))
                         ],
                         icons: {
                             loading: '<div class="premium-loader mx-auto"></div>',
@@ -3380,10 +3796,14 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                             pause: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
                         }
                     });
+                    applySubtitleStyles(this.playerInstance);
                     this.playerInstance.on('ready', () => {
+                        applySubtitleStyles(this.playerInstance);
                         try { this.playerInstance.play(); } catch(e){}
                     });
                     this.playerInstance.on('video:ended', () => { this.playNextTrack(); });
+                    this.playerInstance.on('play', () => { this.mediaPlayerModal.isPlaying = true; });
+                    this.playerInstance.on('pause', () => { this.mediaPlayerModal.isPlaying = false; });
                     this.playerInstance.on('error', (error, reconnectTime) => {
                         const ua = navigator.userAgent;
                         const isApple = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
@@ -3421,7 +3841,9 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             if (e.target.closest('button') || e.target.closest('a') || e.target.closest('audio') || e.target.closest('video')) {
                 return;
             }
-            e.preventDefault();
+            if (!e.type.startsWith('touch')) {
+                e.preventDefault();
+            }
             const modalEl = e.currentTarget.closest('.fixed');
             if (!modalEl) return;
             const rect = modalEl.getBoundingClientRect();
@@ -3435,11 +3857,20 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             const dragStartY = clientY;
             const playerStartX = this.mediaPlayerModal.x;
             const playerStartY = this.mediaPlayerModal.y;
+            this.mediaPlayerModal.isDragging = false;
+            let moved = false;
             const onDrag = (moveEvent) => {
+                if (moveEvent.cancelable) {
+                    moveEvent.preventDefault();
+                }
                 const curX = moveEvent.type.startsWith('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
                 const curY = moveEvent.type.startsWith('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
                 const deltaX = curX - dragStartX;
                 const deltaY = curY - dragStartY;
+                if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+                    moved = true;
+                    this.mediaPlayerModal.isDragging = true;
+                }
                 let newX = playerStartX + deltaX;
                 let newY = playerStartY + deltaY;
                 const screenWidth = window.innerWidth;
@@ -3458,6 +3889,11 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 document.removeEventListener('mouseup', onDragEnd);
                 document.removeEventListener('touchmove', onDrag);
                 document.removeEventListener('touchend', onDragEnd);
+                if (moved) {
+                    setTimeout(() => {
+                        this.mediaPlayerModal.isDragging = false;
+                    }, 50);
+                }
             };
             document.addEventListener('mousemove', onDrag);
             document.addEventListener('mouseup', onDragEnd);
@@ -3492,6 +3928,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.mediaPlayerModal.playlistOpen = playlistOpen;
             this.mediaPlayerModal.x = x;
             this.mediaPlayerModal.y = y;
+            this.mediaPlayerModal.bubbleMode = false;
         },
         playNextTrack() {
             if (this.mediaPlayerModal.playlist.length === 0) return;
@@ -3508,6 +3945,17 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 prevIndex = this.mediaPlayerModal.playlist.length - 1;
             }
             this.playTrackByIndex(prevIndex);
+        },
+        togglePlayState() {
+            if (this.mediaPlayerModal.isAudio) {
+                if (this.plyrInstance) {
+                    this.plyrInstance.togglePlay();
+                }
+            } else {
+                if (this.playerInstance) {
+                    this.playerInstance.toggle();
+                }
+            }
         },
         openImageViewer(src, filename, file = null) {
             if (this.imageViewer.src === src && this.imageViewer.filename === filename) {
@@ -5976,7 +6424,7 @@ function shareApp() {
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
         pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
-        mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false },
+        mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false, bubbleMode: false, isDragging: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
         
         init() { 
@@ -6010,6 +6458,37 @@ function shareApp() {
                     setTimeout(() => {
                         try { this.playerInstance.resize(); } catch(e){}
                     }, 350);
+                }
+            });
+
+            this.$watch('mediaPlayerModal.bubbleMode', value => {
+                if (!value && this.mediaPlayerModal.minimized) {
+                    if (this.mediaPlayerModal.x !== null && this.mediaPlayerModal.y !== null) {
+                        const screenWidth = window.innerWidth;
+                        const screenHeight = window.innerHeight;
+                        const cardWidth = screenWidth >= 768 ? 380 : Math.min(screenWidth - 32, 340);
+                        const cardHeight = this.mediaPlayerModal.playlistOpen ? 420 : 280;
+                        
+                        let newX = this.mediaPlayerModal.x;
+                        let newY = this.mediaPlayerModal.y;
+                        
+                        if (newX + cardWidth > screenWidth - 10) {
+                            newX = screenWidth - cardWidth - 10;
+                        }
+                        if (newX < 10) {
+                            newX = 10;
+                        }
+                        
+                        if (newY + cardHeight > screenHeight - 10) {
+                            newY = screenHeight - cardHeight - 10;
+                        }
+                        if (newY < 10) {
+                            newY = 10;
+                        }
+                        
+                        this.mediaPlayerModal.x = newX;
+                        this.mediaPlayerModal.y = newY;
+                    }
                 }
             });
 
@@ -6179,7 +6658,9 @@ function shareApp() {
                 y: null,
                 playlist: [],
                 playlistIndex: -1,
-                playlistOpen: false
+                playlistOpen: false,
+                bubbleMode: false,
+                isDragging: false
             };
             this.initPlaylist(file);
             
@@ -6262,7 +6743,10 @@ function shareApp() {
                             escape: false,
                         },
                         settings: [
-                            buildArtplayerSubtitleSetting(file.filename, this.files || true, this.shareToken, (k) => this.t(k))
+                            buildArtplayerSubtitleSetting(file.filename, this.files || true, this.shareToken, (k) => this.t(k)),
+                            buildSubtitleBackgroundSetting((k) => this.t(k)),
+                            buildSubtitleSizeSetting((k) => this.t(k)),
+                            buildSubtitleColorSetting((k) => this.t(k))
                         ],
                         icons: {
                             loading: '<div class="premium-loader mx-auto"></div>',
@@ -6271,10 +6755,14 @@ function shareApp() {
                             pause: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
                         }
                     });
+                    applySubtitleStyles(this.playerInstance);
                     this.playerInstance.on('ready', () => {
+                        applySubtitleStyles(this.playerInstance);
                         try { this.playerInstance.play(); } catch(e){}
                     });
                     this.playerInstance.on('video:ended', () => { this.playNextTrack(); });
+                    this.playerInstance.on('play', () => { this.mediaPlayerModal.isPlaying = true; });
+                    this.playerInstance.on('pause', () => { this.mediaPlayerModal.isPlaying = false; });
                     this.playerInstance.on('error', (error, reconnectTime) => {
                         const ua = navigator.userAgent;
                         const isApple = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Safari") && !ua.includes("Chrome") && !ua.includes("Edg"));
@@ -6320,7 +6808,9 @@ function shareApp() {
             if (e.target.closest('button') || e.target.closest('a') || e.target.closest('audio') || e.target.closest('video')) {
                 return;
             }
-            e.preventDefault();
+            if (!e.type.startsWith('touch')) {
+                e.preventDefault();
+            }
             const modalEl = e.currentTarget.closest('.fixed');
             if (!modalEl) return;
             const rect = modalEl.getBoundingClientRect();
@@ -6334,11 +6824,20 @@ function shareApp() {
             const dragStartY = clientY;
             const playerStartX = this.mediaPlayerModal.x;
             const playerStartY = this.mediaPlayerModal.y;
+            this.mediaPlayerModal.isDragging = false;
+            let moved = false;
             const onDrag = (moveEvent) => {
+                if (moveEvent.cancelable) {
+                    moveEvent.preventDefault();
+                }
                 const curX = moveEvent.type.startsWith('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
                 const curY = moveEvent.type.startsWith('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
                 const deltaX = curX - dragStartX;
                 const deltaY = curY - dragStartY;
+                if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+                    moved = true;
+                    this.mediaPlayerModal.isDragging = true;
+                }
                 let newX = playerStartX + deltaX;
                 let newY = playerStartY + deltaY;
                 const screenWidth = window.innerWidth;
@@ -6357,6 +6856,11 @@ function shareApp() {
                 document.removeEventListener('mouseup', onDragEnd);
                 document.removeEventListener('touchmove', onDrag);
                 document.removeEventListener('touchend', onDragEnd);
+                if (moved) {
+                    setTimeout(() => {
+                        this.mediaPlayerModal.isDragging = false;
+                    }, 50);
+                }
             };
             document.addEventListener('mousemove', onDrag);
             document.addEventListener('mouseup', onDragEnd);
@@ -6391,6 +6895,7 @@ function shareApp() {
             this.mediaPlayerModal.playlistOpen = playlistOpen;
             this.mediaPlayerModal.x = x;
             this.mediaPlayerModal.y = y;
+            this.mediaPlayerModal.bubbleMode = false;
         },
         playNextTrack() {
             if (this.mediaPlayerModal.playlist.length === 0) return;
@@ -6407,6 +6912,17 @@ function shareApp() {
                 prevIndex = this.mediaPlayerModal.playlist.length - 1;
             }
             this.playTrackByIndex(prevIndex);
+        },
+        togglePlayState() {
+            if (this.mediaPlayerModal.isAudio) {
+                if (this.plyrInstance) {
+                    this.plyrInstance.togglePlay();
+                }
+            } else {
+                if (this.playerInstance) {
+                    this.playerInstance.toggle();
+                }
+            }
         },
         openImageViewer(src, filename, file = null) {
             if (this.imageViewer.src === src && this.imageViewer.filename === filename) {
@@ -10163,7 +10679,10 @@ function shareFileApp() {
                                         escape: false,
                                     },
                                     settings: [
-                                        buildArtplayerSubtitleSetting(this.filename, [], true, this.token, (k) => this.t(k))
+                                        buildArtplayerSubtitleSetting(this.filename, [], true, this.token, (k) => this.t(k)),
+                                        buildSubtitleBackgroundSetting((k) => this.t(k)),
+                                        buildSubtitleSizeSetting((k) => this.t(k)),
+                                        buildSubtitleColorSetting((k) => this.t(k))
                                     ],
                                     icons: {
                                         loading: '<div class="premium-loader mx-auto"></div>',
@@ -10171,6 +10690,10 @@ function shareFileApp() {
                                         play: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
                                         pause: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
                                     }
+                                });
+                                applySubtitleStyles(this.playerInstance);
+                                this.playerInstance.on('ready', () => {
+                                    applySubtitleStyles(this.playerInstance);
                                 });
                                 this.playerInstance.on('error', (error, reconnectTime) => {
                                     const ua = navigator.userAgent;

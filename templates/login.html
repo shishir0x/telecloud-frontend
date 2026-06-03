@@ -53,9 +53,10 @@
             <p class="text-slate-600 dark:text-slate-300 text-sm mb-2" x-text="toastModal.message"></p>
 
             <button x-show="!toastModal.persistent" @click="toastModal.show = false"
-                class="mt-4 w-full py-3 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95"
-                :class="toastModal.type === 'error' ? 'bg-red-600 hover:bg-red-500 shadow-red-500/25' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/25'"
-                x-text="t('close')">
+                class="mt-4 w-full py-3 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-1.5"
+                :class="toastModal.type === 'error' ? 'bg-red-600 hover:bg-red-500 shadow-red-500/25' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/25'">
+                <i class="fa-solid fa-xmark"></i>
+                <span x-text="t('close')"></span>
             </button>
         </div>
     </div>
@@ -75,17 +76,94 @@
 
             <div class="flex justify-end gap-3 mt-2" x-show="modal.type !== 'alert'">
                 <button @click="closeUIModal(null)"
-                    class="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium transition-colors"
-                    x-text="t('cancel')"></button>
+                    class="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium transition-colors flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-xmark"></i>
+                    <span x-text="t('cancel')"></span>
+                </button>
                 <button @click="closeUIModal(modal.type === 'prompt' ? modal.input : true)"
-                    class="px-5 py-2 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95 bg-blue-600 hover:bg-blue-500 shadow-blue-500/25"
-                    x-text="t('confirm')"></button>
+                    class="px-5 py-2 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95 bg-blue-600 hover:bg-blue-500 shadow-blue-500/25 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span x-text="t('confirm')"></span>
+                </button>
             </div>
             <div class="flex justify-end gap-3 mt-2" x-show="modal.type === 'alert'">
                 <button @click="closeUIModal(true)"
-                    class="px-5 py-2 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95 bg-blue-600 hover:bg-blue-500 shadow-blue-500/25"
-                    x-text="t('close')"></button>
+                    class="px-5 py-2 rounded-xl text-white font-medium shadow-lg transition-transform active:scale-95 bg-blue-600 hover:bg-blue-500 shadow-blue-500/25 flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-xmark"></i>
+                    <span x-text="t('close')"></span>
+                </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Force Password Change Modal (First Login) -->
+    <div x-show="forceChangeModal.show" x-cloak
+        class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+        x-transition.opacity>
+        <div @click.outside="if(!forceChangeModal.persistent) { forceChangeModal.show = false; if(forceChangeModal.resolve) forceChangeModal.resolve(false); }"
+            class="glass-menu w-[90%] max-w-sm rounded-[2rem] p-6 shadow-2xl animate-modal-in border border-white/20 relative">
+            
+            <div class="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-500 flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <i class="fa-solid fa-shield-halved text-3xl"></i>
+            </div>
+            
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white text-center mb-2" x-text="t('force_password_change_title')"></h3>
+            <p class="text-slate-500 dark:text-slate-400 text-xs text-center mb-6" x-text="t('force_password_change_msg')"></p>
+            
+            <form @submit.prevent="submitFirstTimePasswordChange" class="space-y-4">
+                <!-- New Password Field -->
+                <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block" x-text="t('new_password')"></label>
+                    <div class="flex items-center justify-between p-3.5 bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 rounded-xl relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+                        <input :type="forceChangeModal.showNewPassword ? 'text' : 'password'" 
+                               x-model="forceChangeModal.newPassword"
+                               required
+                               :placeholder="t('enter_new_password') || 'Enter new password'"
+                               class="bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-sm text-slate-900 dark:text-white w-[calc(100%-35px)]">
+                        <button type="button" @click="forceChangeModal.showNewPassword = !forceChangeModal.showNewPassword" class="text-slate-400 hover:text-blue-500 p-1 transition-colors">
+                            <i class="fa-regular" :class="forceChangeModal.showNewPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Confirm Password Field -->
+                <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5 block" x-text="t('confirm_password')"></label>
+                    <div class="flex items-center justify-between p-3.5 bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 rounded-xl relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+                        <input :type="forceChangeModal.showConfirmPassword ? 'text' : 'password'" 
+                               x-model="forceChangeModal.confirmPassword"
+                               required
+                               :placeholder="t('confirm_password')"
+                               class="bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-sm text-slate-900 dark:text-white w-[calc(100%-35px)]">
+                        <button type="button" @click="forceChangeModal.showConfirmPassword = !forceChangeModal.showConfirmPassword" class="text-slate-400 hover:text-blue-500 p-1 transition-colors">
+                            <i class="fa-regular" :class="forceChangeModal.showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                        </button>
+                    </div>
+                </div>
+ 
+                <!-- Error Badge -->
+                <div x-show="forceChangeModal.error" x-cloak
+                    class="p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-2 animate-shake">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span x-text="forceChangeModal.error"></span>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @click="forceChangeModal.show = false; if(forceChangeModal.resolve) forceChangeModal.resolve(false);" 
+                        class="flex-1 py-3 px-4 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold transition-all text-sm border border-transparent flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span x-text="t('cancel')"></span>
+                    </button>
+                    <button type="submit" 
+                        class="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-lg shadow-blue-500/25 transition-all text-sm flex items-center justify-center gap-1.5"
+                        :disabled="forceChangeModal.loading">
+                        <i class="fa-solid fa-spinner fa-spin" x-show="forceChangeModal.loading"></i>
+                        <i class="fa-solid fa-check" x-show="!forceChangeModal.loading"></i>
+                        <span x-text="t('confirm')"></span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
