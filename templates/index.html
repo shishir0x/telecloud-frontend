@@ -1110,6 +1110,13 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <!-- Mobile App Link -->
+                    <a href="https://telecloud-app.dabeecao.org" target="_blank" :title="t('mobile_app')"
+                        class="h-9 sm:h-10 px-2 sm:px-3 flex items-center gap-2 text-slate-500 hover:text-blue-500 bg-white/50 dark:bg-slate-800/50 rounded-xl border border-transparent hover:border-blue-100 dark:hover:border-blue-900 transition-colors">
+                        <i class="fa-solid fa-mobile-screen-button text-base sm:text-lg text-blue-500 dark:text-blue-400"></i>
+                        <span class="text-xs sm:text-sm font-bold hidden sm:inline" x-text="t('mobile_app')"></span>
+                    </a>
+
                     <!-- Language Dropdown -->
                     <div class="relative z-[110]" x-data="{ open: false }">
                         <button @click="open = !open" @click.outside="open = false"
@@ -2109,6 +2116,36 @@
                         </div>
 
                         <div class="flex flex-col gap-6">
+                            <!-- Mobile App Card -->
+                            <div class="glass-panel p-6 rounded-3xl border border-white/10 flex flex-col justify-between">
+                                <div>
+                                    <h3 class="text-lg font-bold mb-3 flex items-center gap-2">
+                                        <i class="fa-solid fa-mobile-screen-button text-blue-500"></i>
+                                        <span x-text="t('mobile_app')">Mobile App</span>
+                                    </h3>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed" x-text="t('mobile_app_desc')">
+                                        Experience TeleCloud on your mobile device. Access, upload, and stream your files anywhere.
+                                    </p>
+                                    <div class="mb-5">
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block" x-text="t('server_url')">Server URL</span>
+                                        <div class="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 rounded-2xl">
+                                            <div class="text-xs font-mono text-slate-700 dark:text-slate-200 break-all select-all font-semibold"
+                                                x-text="window.location.origin"></div>
+                                            <button
+                                                @click="TeleCloud.copyToClipboard(window.location.origin); showToast(t('toast_copied', {t: 'URL'}), 'success')"
+                                                class="p-1.5 text-slate-400 hover:text-blue-500 transition-colors shrink-0 ml-2">
+                                                <i class="fa-regular fa-copy text-base"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <a href="https://telecloud-app.dabeecao.org" target="_blank"
+                                    class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20">
+                                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                                    <span x-text="t('download_use_app')">Open Mobile App</span>
+                                </a>
+                            </div>
+
                             <!-- Appearance Card -->
                             <div class="glass-panel p-6 rounded-3xl border border-white/10">
                                 <h3 class="text-lg font-bold flex items-center gap-2 mb-4">
