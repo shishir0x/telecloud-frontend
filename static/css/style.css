@@ -839,8 +839,30 @@ body.art-fullscreen-active {
     border-radius: 0.75rem !important;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
     color: var(--text-primary) !important;
-    overflow: hidden !important;
     font-family: inherit !important;
+}
+
+/* Fix Artplayer settings panel scrolling and item heights for large subtitle lists */
+.art-setting-panel {
+    max-height: 280px !important;
+    overflow-y: auto !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--border-light) transparent !important;
+}
+
+.art-setting-item {
+    height: auto !important;
+    min-height: 34px !important;
+    padding: 6px 12px !important;
+    line-height: 1.4 !important;
+}
+
+.art-setting-item-left,
+.art-setting-item-right,
+.art-setting-item-option {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 
 /* Specific border radius adjustments for smaller volume inner card */

@@ -18,12 +18,16 @@ window.Alpine = Alpine;
 // Asynchronous loader helper for Artplayer & Plyr
 async function ensurePlayersLoaded() {
     if (window.Artplayer && window.Plyr) return;
-    const [artModule, plyrModule] = await Promise.all([
+    const [artModule, plyrModule, jassubModule, chapterModule] = await Promise.all([
         import('artplayer'),
-        import('plyr')
+        import('plyr'),
+        import('artplayer-plugin-jassub').catch(() => null),
+        import('artplayer-plugin-chapter').catch(() => null)
     ]);
     window.Artplayer = artModule.default;
     window.Plyr = plyrModule.default;
+    if (jassubModule) window.artplayerPluginJassub = jassubModule.default;
+    if (chapterModule) window.artplayerPluginChapter = chapterModule.default;
     window.Artplayer.option.logger = false;
 }
 
@@ -89,9 +93,98 @@ const artplayerI18n = {
         'Setting': 'Cài đặt',
         'Settings': 'Cài đặt',
         'Show setting': 'Cài đặt',
-        'Show Setting': 'Cài đặt',
+        'Show Setting': 'Cài đặt'
     }
 };
+
+
+
+function parseVttChapters(vttText) {
+    if (!vttText) return [];
+    const lines = vttText.split(/\r?\n/);
+    const chapters = [];
+    let currentCue = null;
+
+    const timeToSeconds = (str) => {
+        const parts = str.trim().split(':');
+        if (parts.length === 3) {
+            return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2].replace(',', '.'));
+        } else if (parts.length === 2) {
+            return parseFloat(parts[0]) * 60 + parseFloat(parts[1].replace(',', '.'));
+        }
+        return 0;
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.includes('-->')) {
+            const times = line.split('-->');
+            currentCue = {
+                start: timeToSeconds(times[0]),
+                end: timeToSeconds(times[1]),
+                title: ''
+            };
+        } else if (currentCue && line && !line.startsWith('WEBVTT') && !line.startsWith('NOTE')) {
+            if (!currentCue.title) {
+                currentCue.title = line;
+                chapters.push(currentCue);
+                currentCue = null;
+            }
+        }
+    }
+    return chapters;
+}
+
+function setupChapterDetection(player, videoFilename, filesList, isShare, shareToken) {
+    if (!player) return;
+    
+    player.on('video:loadedmetadata', () => {
+        const nativeTextTracks = player.video ? player.video.textTracks : null;
+        if (nativeTextTracks && nativeTextTracks.length > 0) {
+            for (let i = 0; i < nativeTextTracks.length; i++) {
+                const track = nativeTextTracks[i];
+                if (track.kind === 'chapters') {
+                    track.mode = 'hidden';
+                    if (track.cues && track.cues.length > 0) {
+                        const chapterList = [];
+                        for (let j = 0; j < track.cues.length; j++) {
+                            const cue = track.cues[j];
+                            chapterList.push({
+                                start: cue.startTime,
+                                end: cue.endTime,
+                                title: cue.text || `Chapter ${j + 1}`
+                            });
+                        }
+                        if (chapterList.length > 0 && player.plugins.artplayerPluginChapter) {
+                            player.plugins.artplayerPluginChapter.update({ chapters: chapterList });
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (videoFilename && filesList && Array.isArray(filesList) && filesList.length > 0) {
+            const lastDot = videoFilename.lastIndexOf('.');
+            const videoBase = (lastDot !== -1 ? videoFilename.substring(0, lastDot) : videoFilename).toLowerCase();
+            const chapterFile = filesList.find(f => {
+                if (f.is_folder) return false;
+                const fname = f.filename.toLowerCase();
+                return fname.endsWith('.chapters.vtt') || fname.endsWith('.chapters.srt') || (fname.startsWith(videoBase) && fname.includes('chapter') && (fname.endsWith('.vtt') || fname.endsWith('.srt')));
+            });
+
+            if (chapterFile) {
+                const url = isShare ? `/s/${shareToken}/file/${chapterFile.id}/stream` : `/api/files/${chapterFile.id}/stream`;
+                fetch(url).then(res => res.text()).then(text => {
+                    const parsedChapters = parseVttChapters(text);
+                    if (parsedChapters.length > 0 && player.plugins.artplayerPluginChapter) {
+                        player.plugins.artplayerPluginChapter.update({ chapters: parsedChapters });
+                    }
+                }).catch(() => {});
+            }
+        }
+    });
+}
 
 function findSubtitlesForVideo(videoFilename, filesList, isShare, shareToken) {
     if (!videoFilename || !filesList || filesList.length === 0) return [];
@@ -147,6 +240,7 @@ function buildArtplayerSubtitleSetting(videoFilename, filesList, isShare, shareT
     });
 
     return {
+        name: 'subtitle',
         width: 250,
         html: tFunc ? tFunc('subtitles') : 'Subtitles',
         tooltip: matchedSubs.length > 0 ? matchedSubs[0].html : (tFunc ? tFunc('subtitles_off') : 'Off'),
@@ -166,6 +260,7 @@ function buildArtplayerSubtitleSetting(videoFilename, filesList, isShare, shareT
                         this.subtitle.show = true;
                         
                         this.setting.update({
+                            name: 'subtitle',
                             html: tFunc ? tFunc('subtitles') : 'Subtitles',
                             tooltip: file.name,
                         });
@@ -175,7 +270,7 @@ function buildArtplayerSubtitleSetting(videoFilename, filesList, isShare, shareT
                 return 'Loading...';
             } else if (item.url) {
                 this.subtitle.url = item.url;
-                this.subtitle.type = item.type;
+                this.subtitle.type = item.type || 'vtt';
                 this.subtitle.show = true;
                 return item.html;
             } else {
@@ -3239,7 +3334,12 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         },
 
         async uploadSingleFile(file, taskId, targetPath, overwrite = false) {
-            const CHUNK_SIZE = 50 * 1024 * 1024;
+            let CHUNK_SIZE = 5 * 1024 * 1024;
+            if (file.size > 1000 * 1024 * 1024) {
+                CHUNK_SIZE = 16 * 1024 * 1024;
+            } else if (file.size > 100 * 1024 * 1024) {
+                CHUNK_SIZE = 10 * 1024 * 1024;
+            }
             const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
             let hasError = false;
             let task = this.uploadQueue.find(t => t.id === taskId);
@@ -3789,6 +3889,16 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                             buildSubtitleSizeSetting((k) => this.t(k)),
                             buildSubtitleColorSetting((k) => this.t(k))
                         ],
+                        plugins: (function() {
+                            const plugins = [];
+                            if (window.artplayerPluginJassub && matchedSubs.length > 0 && matchedSubs[0].type === 'ass') {
+                                plugins.push(window.artplayerPluginJassub({ subUrl: matchedSubs[0].url }));
+                            }
+                            if (window.artplayerPluginChapter) {
+                                plugins.push(window.artplayerPluginChapter({ chapters: [] }));
+                            }
+                            return plugins;
+                        })(),
                         icons: {
                             loading: '<div class="premium-loader mx-auto"></div>',
                             state: '<svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" style="transform: translateX(2px);"><path d="M8 5v14l11-7z"/></svg>',
@@ -3797,6 +3907,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                         }
                     });
                     applySubtitleStyles(this.playerInstance);
+                    setupChapterDetection(this.playerInstance, file.filename, this.files || [], false, '');
                     this.playerInstance.on('ready', () => {
                         applySubtitleStyles(this.playerInstance);
                         try { this.playerInstance.play(); } catch(e){}
@@ -6748,6 +6859,16 @@ function shareApp() {
                             buildSubtitleSizeSetting((k) => this.t(k)),
                             buildSubtitleColorSetting((k) => this.t(k))
                         ],
+                        plugins: (function() {
+                            const plugins = [];
+                            if (window.artplayerPluginJassub && matchedSubs.length > 0 && matchedSubs[0].type === 'ass') {
+                                plugins.push(window.artplayerPluginJassub({ subUrl: matchedSubs[0].url }));
+                            }
+                            if (window.artplayerPluginChapter) {
+                                plugins.push(window.artplayerPluginChapter({ chapters: [] }));
+                            }
+                            return plugins;
+                        })(),
                         icons: {
                             loading: '<div class="premium-loader mx-auto"></div>',
                             state: '<svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" style="transform: translateX(2px);"><path d="M8 5v14l11-7z"/></svg>',
@@ -6756,6 +6877,7 @@ function shareApp() {
                         }
                     });
                     applySubtitleStyles(this.playerInstance);
+                    setupChapterDetection(this.playerInstance, file.filename, this.files || [], true, this.shareToken);
                     this.playerInstance.on('ready', () => {
                         applySubtitleStyles(this.playerInstance);
                         try { this.playerInstance.play(); } catch(e){}
@@ -10684,6 +10806,13 @@ function shareFileApp() {
                                         buildSubtitleSizeSetting((k) => this.t(k)),
                                         buildSubtitleColorSetting((k) => this.t(k))
                                     ],
+                                    plugins: (function() {
+                                        const plugins = [];
+                                        if (window.artplayerPluginChapter) {
+                                            plugins.push(window.artplayerPluginChapter({ chapters: [] }));
+                                        }
+                                        return plugins;
+                                    })(),
                                     icons: {
                                         loading: '<div class="premium-loader mx-auto"></div>',
                                         state: '<svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" style="transform: translateX(2px);"><path d="M8 5v14l11-7z"/></svg>',
@@ -10692,6 +10821,7 @@ function shareFileApp() {
                                     }
                                 });
                                 applySubtitleStyles(this.playerInstance);
+                                setupChapterDetection(this.playerInstance, this.filename, [], true, this.token);
                                 this.playerInstance.on('ready', () => {
                                     applySubtitleStyles(this.playerInstance);
                                 });
