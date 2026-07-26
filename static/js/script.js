@@ -2931,45 +2931,6 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.uploadModal = false; 
             await this.handleDroppedData(e.dataTransfer); 
         },
-        async scanFiles(items) {
-            const files = [];
-            const scan = async (entry, path = '') => {
-                if (entry.isFile) {
-                    const file = await new Promise((resolve) => entry.file(resolve));
-                    if (path) file.relativeDir = path.endsWith('/') ? path.slice(0, -1) : path;
-                    files.push(file);
-                } else if (entry.isDirectory) {
-                    const reader = entry.createReader();
-                    const entries = await new Promise((resolve) => {
-                        let allEntries = [];
-                        const read = () => {
-                            reader.readEntries((results) => {
-                                if (results.length) {
-                                    allEntries = allEntries.concat(results);
-                                    read();
-                                } else {
-                                    resolve(allEntries);
-                                }
-                            });
-                        };
-                        read();
-                    });
-                    for (const child of entries) {
-                        await scan(child, path + entry.name + '/');
-                    }
-                }
-            };
-
-            for (const item of items) {
-                if (item.webkitGetAsEntry) {
-                    const entry = item.webkitGetAsEntry();
-                    if (entry) await scan(entry);
-                } else if (item.kind === 'file') {
-                    files.push(item.getAsFile());
-                }
-            }
-            return files;
-        },
         async handleDroppedData(dataTransfer) {
             // Synchronously extract all values from dataTransfer before any async call
             // as the browser clears dataTransfer after the event loop turn finishes.
@@ -3000,7 +2961,13 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             if (entries.length > 0) {
                 const scan = async (entry, path = '') => {
                     if (entry.isFile) {
-                        const file = await new Promise((resolve) => entry.file(resolve));
+                        // Error callback is mandatory: without it a locked/unreadable file
+                        // leaves the Promise pending forever and silently kills the whole drop.
+                        const file = await new Promise((resolve) => entry.file(resolve, (err) => {
+                            console.warn('[Drop] Cannot read file entry:', entry.fullPath || entry.name, err);
+                            resolve(null);
+                        }));
+                        if (!file) return;
                         if (path) file.relativeDir = path.endsWith('/') ? path.slice(0, -1) : path;
                         files.push(file);
                     } else if (entry.isDirectory) {
@@ -3015,6 +2982,9 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                                     } else {
                                         resolve(allEntries);
                                     }
+                                }, (err) => {
+                                    console.warn('[Drop] Cannot read directory:', entry.fullPath || entry.name, err);
+                                    resolve(allEntries);
                                 });
                             };
                             read();
@@ -3382,12 +3352,14 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                                     .filter(i => !existingChunks.includes(i));
             
             if (chunkQueue.length === 0 && totalChunks > 0) {
-                // All chunks already uploaded
+                // All chunks already uploaded — still register the fallback poller so the
+                // task cannot hang at 50% if WS misses the terminal message.
                 task = this.uploadQueue.find(t => t.id === taskId);
                 if (task) {
                     task.progress = 50;
                     task.statusText = this.t('syncing_tg');
                 }
+                this.registerTaskPoll(taskId);
                 return;
             }
             
@@ -3542,106 +3514,126 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             await Promise.all(workers);
 
             // Fallback polling: if WS missed the `done`/`error` message (common when uploading
-            // many files simultaneously and WS reconnects or browser is overloaded), poll the
-            // task status API until we get a terminal state. Max 10 minutes.
+            // many files simultaneously and WS reconnects or browser is overloaded), register
+            // with the shared poller which resolves terminal states via the task status API.
             if (!hasError) {
-                const POLL_INTERVAL = 3000;
-                const POLL_TIMEOUT = 10 * 60 * 1000;
-                const pollStart = Date.now();
+                this.registerTaskPoll(taskId);
+            }
+        },
 
-                const pollTask = async () => {
-                    while (Date.now() - pollStart < POLL_TIMEOUT) {
-                        // Stop polling if WS already updated the task to a terminal state
-                        const t = this.uploadQueue.find(q => q.id === taskId);
-                        if (!t) return; // Task removed from queue
-                        if (t.status === 'done' || t.isCancelled || t.hasError) return;
+        // Marks a task done with the standard 5s removal countdown. Guarded by
+        // _countdownStarted so WS handler and poller never double-start timers.
+        finishTaskDone(task, serverTask) {
+            task.progress = 100;
+            task.status = 'done';
+            task.statusText = this.t('done');
+            task.hasError = false;
+            if (serverTask && serverTask.file_id) task.fileId = serverTask.file_id;
+            this.fetchFiles(true);
+            if (task._countdownStarted) return;
+            task._countdownStarted = true;
+            task.countdown = 5;
+            if (task.countdownInterval) clearInterval(task.countdownInterval);
+            task.countdownInterval = setInterval(() => {
+                task.countdown--;
+                if (task.countdown <= 0) {
+                    clearInterval(task.countdownInterval);
+                    this.uploadQueue = this.uploadQueue.filter(q => q.id !== task.id);
+                }
+            }, 1000);
+        },
 
-                        await new Promise(r => setTimeout(r, POLL_INTERVAL));
+        // Shared status poller: one loop and one `/api/tasks` request per tick for ALL
+        // registered tasks, instead of a separate polling loop per uploaded file
+        // (which multiplied identical requests when uploading many files at once).
+        registerTaskPoll(taskId) {
+            if (!this._pollTasks) this._pollTasks = new Map();
+            if (this._pollTasks.has(taskId)) return;
+            this._pollTasks.set(taskId, { start: Date.now(), missing: 0 });
+            if (this._pollLoopRunning) return;
+            this._pollLoopRunning = true;
 
-                        try {
-                            const res = await fetch('/api/tasks');
-                            if (!res.ok) continue;
-                            const data = await res.json();
-                            const serverTask = data.tasks && data.tasks[taskId];
-                            const task = this.uploadQueue.find(q => q.id === taskId);
-                            if (!task) return;
+            const POLL_INTERVAL = 3000;
+            const POLL_TIMEOUT = 10 * 60 * 1000;
 
-                            if (!serverTask) {
-                                // Task no longer on server — may have been cleaned up after done
-                                // Give WS a little more time before giving up
-                                await new Promise(r => setTimeout(r, 2000));
-                                const t2 = this.uploadQueue.find(q => q.id === taskId);
-                                if (t2 && t2.status !== 'done' && !t2.hasError) {
-                                    // Still not updated — assume done (task cleaned up = completed)
-                                    task.progress = 100;
-                                    task.status = 'done';
-                                    task.statusText = this.t('done');
-                                    task.hasError = false;
-                                    this.fetchFiles(true);
-                                    task.countdown = 5;
-                                    const timer = setInterval(() => {
-                                        task.countdown--;
-                                        if (task.countdown <= 0) {
-                                            clearInterval(timer);
-                                            this.uploadQueue = this.uploadQueue.filter(q => q.id !== taskId);
-                                        }
-                                    }, 1000);
-                                }
-                                return;
-                            }
+            const loop = async () => {
+                while (this._pollTasks.size > 0) {
+                    await new Promise(r => setTimeout(r, POLL_INTERVAL));
 
-                            if (serverTask.status === 'done') {
-                                task.progress = 100;
-                                task.status = 'done';
-                                task.statusText = this.t('done');
-                                task.hasError = false;
-                                if (serverTask.file_id) task.fileId = serverTask.file_id;
-                                this.fetchFiles(true);
-                                task.countdown = 5;
-                                const timer = setInterval(() => {
-                                    task.countdown--;
-                                    if (task.countdown <= 0) {
-                                        clearInterval(timer);
-                                        this.uploadQueue = this.uploadQueue.filter(q => q.id !== taskId);
-                                    }
-                                }, 1000);
-                                return;
-                            } else if (serverTask.status === 'error') {
-                                const errorMsg = serverTask.message || '';
-                                let displayError;
-                                const colonIdx = errorMsg.indexOf(': ');
-                                if (colonIdx > 0) {
-                                    const keyPart = errorMsg.substring(0, colonIdx);
-                                    const detailPart = errorMsg.substring(colonIdx + 2);
-                                    const translatedKey = this.t(keyPart);
-                                    displayError = (translatedKey !== keyPart) ? translatedKey + ' (' + detailPart + ')' : errorMsg;
-                                } else {
-                                    const translated = this.t(errorMsg);
-                                    displayError = (translated !== errorMsg) ? translated : errorMsg;
-                                }
-                                task.statusText = this.t('status_error') + ': ' + displayError;
-                                task.hasError = true;
-                                task.status = 'error';
-                                return;
-                            } else if (serverTask.status === 'cancelled') {
-                                task.statusText = this.t('cancelled');
-                                task.isCancelled = true;
-                                task.status = 'cancelled';
-                                return;
-                            }
-                            // Still in progress — update progress display from server data
-                            if (serverTask.status === 'telegram' && serverTask.percent !== undefined) {
-                                task.progress = 50 + Math.round(serverTask.percent / 2);
-                                task.statusText = this.t('telegram');
-                            }
-                        } catch (e) {
-                            console.warn('[Poll] Task status check failed:', e);
+                    // Drop tasks resolved by WS, removed from queue, or timed out
+                    for (const [id, st] of this._pollTasks) {
+                        const t = this.uploadQueue.find(q => q.id === id);
+                        if (!t || t.status === 'done' || t.isCancelled || t.hasError ||
+                            Date.now() - st.start > POLL_TIMEOUT) {
+                            this._pollTasks.delete(id);
                         }
                     }
-                };
+                    if (this._pollTasks.size === 0) break;
 
-                pollTask();
-            }
+                    let serverTasks;
+                    try {
+                        const res = await fetch('/api/tasks');
+                        if (!res.ok) continue;
+                        const data = await res.json();
+                        serverTasks = data.tasks || {};
+                    } catch (e) {
+                        console.warn('[Poll] Task status check failed:', e);
+                        continue;
+                    }
+
+                    for (const [id, st] of this._pollTasks) {
+                        const task = this.uploadQueue.find(q => q.id === id);
+                        if (!task) { this._pollTasks.delete(id); continue; }
+
+                        const serverTask = serverTasks[id];
+                        if (!serverTask) {
+                            // Task no longer on server — may have been cleaned up after done.
+                            // Give WS two more poll cycles before assuming completion.
+                            if (++st.missing >= 2) {
+                                this._pollTasks.delete(id);
+                                if (task.status !== 'done' && !task.hasError) {
+                                    this.finishTaskDone(task, null);
+                                }
+                            }
+                            continue;
+                        }
+                        st.missing = 0;
+
+                        if (serverTask.status === 'done') {
+                            this._pollTasks.delete(id);
+                            this.finishTaskDone(task, serverTask);
+                        } else if (serverTask.status === 'error') {
+                            this._pollTasks.delete(id);
+                            const errorMsg = serverTask.message || '';
+                            let displayError;
+                            const colonIdx = errorMsg.indexOf(': ');
+                            if (colonIdx > 0) {
+                                const keyPart = errorMsg.substring(0, colonIdx);
+                                const detailPart = errorMsg.substring(colonIdx + 2);
+                                const translatedKey = this.t(keyPart);
+                                displayError = (translatedKey !== keyPart) ? translatedKey + ' (' + detailPart + ')' : errorMsg;
+                            } else {
+                                const translated = this.t(errorMsg);
+                                displayError = (translated !== errorMsg) ? translated : errorMsg;
+                            }
+                            task.statusText = this.t('status_error') + ': ' + displayError;
+                            task.hasError = true;
+                            task.status = 'error';
+                        } else if (serverTask.status === 'cancelled') {
+                            this._pollTasks.delete(id);
+                            task.statusText = this.t('cancelled');
+                            task.isCancelled = true;
+                            task.status = 'cancelled';
+                        } else if (serverTask.status === 'telegram' && serverTask.percent !== undefined) {
+                            // Still in progress — update progress display from server data
+                            task.progress = 50 + Math.round(serverTask.percent / 2);
+                            task.statusText = this.t('telegram');
+                        }
+                    }
+                }
+                this._pollLoopRunning = false;
+            };
+            loop();
         },
         async toggleShare(file) {
             const targetFile = this.files.find(f => f.id === file.id);
