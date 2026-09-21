@@ -888,13 +888,19 @@
                         </button>
                     </template>
 
-                    <!-- PDF Reader Button -->
+                    <!-- PDF Reader & Open in Tab Buttons -->
                     <template
                         x-if="fileInfoModal.typeName === 'type_pdf' && (!fileInfoModal.tooLarge || fileInfoModal.bypassWarning)">
-                        <button @click="openPdfViewer(fileInfoModal.file); closeFileInfoModal()"
-                            class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold shadow-lg shadow-red-500/25 transition-all duration-300 transform active:scale-95">
-                            <i class="fa-solid fa-file-pdf"></i> <span x-text="t('pdf_reader')"></span>
-                        </button>
+                        <div class="grid grid-cols-2 gap-2 w-full">
+                            <button @click="openPdfViewer(fileInfoModal.file); closeFileInfoModal()"
+                                class="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold shadow-lg shadow-red-500/25 transition-all duration-200 transform active:scale-95 text-sm">
+                                <i class="fa-solid fa-file-pdf"></i> <span x-text="t('pdf_reader')"></span>
+                            </button>
+                            <a :href="getPdfStreamUrl(fileInfoModal.file)" target="_blank" rel="noopener noreferrer"
+                                class="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-semibold transition-all duration-200 transform active:scale-95 text-sm border border-slate-600/50">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> <span>Open in Tab</span>
+                            </a>
+                        </div>
                     </template>
 
                     <!-- Premium Play Button for Video/Audio -->
@@ -4851,13 +4857,15 @@
         x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
         @keyup.window.right="pdfNextPage()" @keyup.window.left="pdfPrevPage()"
-        @keydown.window.down="if (pdfViewer.show) { $event.preventDefault(); if (pdfViewer.scrollMode === 'continuous') { document.getElementById('pdf-continuous-container').scrollBy({ top: 100, behavior: 'smooth' }); } else { pdfNextPage(); } }"
-        @keydown.window.up="if (pdfViewer.show) { $event.preventDefault(); if (pdfViewer.scrollMode === 'continuous') { document.getElementById('pdf-continuous-container').scrollBy({ top: -100, behavior: 'smooth' }); } else { pdfPrevPage(); } }"
+        @keydown.window.down="if (pdfViewer.show) { $event.preventDefault(); const c = document.getElementById('pdf-continuous-container') || document.getElementById('share-pdf-continuous-container') || document.getElementById('share-folder-pdf-continuous-container'); if (pdfViewer.scrollMode === 'continuous' && c) { c.scrollBy({ top: 120, behavior: 'smooth' }); } else { pdfNextPage(); } }"
+        @keydown.window.up="if (pdfViewer.show) { $event.preventDefault(); const c = document.getElementById('pdf-continuous-container') || document.getElementById('share-pdf-continuous-container') || document.getElementById('share-folder-pdf-continuous-container'); if (pdfViewer.scrollMode === 'continuous' && c) { c.scrollBy({ top: -120, behavior: 'smooth' }); } else { pdfPrevPage(); } }"
+        @keydown.window.pagedown="if (pdfViewer.show) { $event.preventDefault(); const c = document.getElementById('pdf-continuous-container') || document.getElementById('share-pdf-continuous-container') || document.getElementById('share-folder-pdf-continuous-container'); if (pdfViewer.scrollMode === 'continuous' && c) { c.scrollBy({ top: c.clientHeight * 0.8, behavior: 'smooth' }); } else { pdfNextPage(); } }"
+        @keydown.window.pageup="if (pdfViewer.show) { $event.preventDefault(); const c = document.getElementById('pdf-continuous-container') || document.getElementById('share-pdf-continuous-container') || document.getElementById('share-folder-pdf-continuous-container'); if (pdfViewer.scrollMode === 'continuous' && c) { c.scrollBy({ top: -c.clientHeight * 0.8, behavior: 'smooth' }); } else { pdfPrevPage(); } }"
         @keyup.window.escape="pdfViewer.show && closePdfViewer()">
 
         <!-- Top Header Panel -->
         <header
-            class="relative z-30 flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700/50 shadow-sm gap-4">
+            class="relative z-30 flex items-center justify-between p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700/50 shadow-sm gap-4">
             <div class="flex items-center gap-3 min-w-0">
                 <button @click="pdfViewer.sidebarOpen = !pdfViewer.sidebarOpen"
                     class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
@@ -4914,7 +4922,7 @@
 
                     <!-- Dark mode invert filter toggle -->
                     <button
-                        @click="pdfViewer.darkModeFilter = !pdfViewer.darkModeFilter; renderPdfPage(pdfViewer.currentPage)"
+                        @click="togglePdfInvert()"
                         class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
                         :class="pdfViewer.darkModeFilter ? 'text-amber-500 bg-slate-100 dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400'"
                         title="Invert Filter (Comfort Reading)">
@@ -4945,6 +4953,29 @@
                     <button @click="pdfZoomIn()"
                         class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200">
                         <i class="fa-solid fa-plus text-xs"></i>
+                    </button>
+
+                    <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                    <!-- Open in Browser Native Tab -->
+                    <a :href="getPdfStreamUrl(pdfViewer.file)" target="_blank" rel="noopener noreferrer"
+                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
+                        title="Open in Browser Native Viewer">
+                        <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+                    </a>
+
+                    <!-- Download PDF -->
+                    <a :href="getPdfDownloadUrl(pdfViewer.file)" download
+                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
+                        title="Download PDF">
+                        <i class="fa-solid fa-download text-sm"></i>
+                    </a>
+
+                    <!-- Print PDF -->
+                    <button @click="printPdf()"
+                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
+                        title="Print Document">
+                        <i class="fa-solid fa-print text-sm"></i>
                     </button>
                 </div>
 
@@ -4995,7 +5026,7 @@
             <div class="flex items-center gap-2">
                 <!-- Dark mode invert filter toggle -->
                 <button
-                    @click="pdfViewer.darkModeFilter = !pdfViewer.darkModeFilter; renderPdfPage(pdfViewer.currentPage)"
+                    @click="togglePdfInvert()"
                     class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
                     :class="pdfViewer.darkModeFilter ? 'text-amber-500 bg-slate-100 dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400'"
                     title="Invert Filter">
@@ -5010,25 +5041,19 @@
                     <i class="fa-solid text-sm" :class="pdfViewer.autoScrollActive ? 'fa-pause' : 'fa-play'"></i>
                 </button>
 
-                <!-- Speed controls (only when auto scroll is active) -->
-                <template x-if="pdfViewer.autoScrollActive">
-                    <div
-                        class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded-xl p-1 transition-all duration-200">
-                        <button @click="changePdfAutoScrollSpeed(-1)"
-                            class="p-1 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-all duration-200"
-                            title="Slower">
-                            <i class="fa-solid fa-minus text-[10px]"></i>
-                        </button>
-                        <span
-                            class="text-[10px] font-bold font-mono text-slate-600 dark:text-slate-300 min-w-[20px] text-center"
-                            x-text="pdfViewer.autoScrollSpeed + 'x'"></span>
-                        <button @click="changePdfAutoScrollSpeed(1)"
-                            class="p-1 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-all duration-200"
-                            title="Faster">
-                            <i class="fa-solid fa-plus text-[10px]"></i>
-                        </button>
-                    </div>
-                </template>
+                <!-- Open in Native Tab -->
+                <a :href="getPdfStreamUrl(pdfViewer.file)" target="_blank" rel="noopener noreferrer"
+                    class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
+                    title="Open in Browser Native Viewer">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+                </a>
+
+                <!-- Download -->
+                <a :href="getPdfDownloadUrl(pdfViewer.file)" download
+                    class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
+                    title="Download PDF">
+                    <i class="fa-solid fa-download text-sm"></i>
+                </a>
             </div>
         </div>
 
@@ -5078,7 +5103,7 @@
 
             <!-- PDF Viewer Center Canvas View -->
             <div
-                class="flex-1 flex flex-col items-center justify-center p-4 relative bg-slate-100/30 dark:bg-slate-950/20">
+                class="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative bg-slate-200/50 dark:bg-slate-950/60">
                 <!-- Spinner/Loader with Progress -->
                 <div x-show="pdfViewer.loading" x-cloak
                     class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white dark:bg-slate-900 z-10">
@@ -5094,7 +5119,7 @@
                         pdfViewer.scrollMode === 'continuous' ? 'p-0 overflow-hidden' : 'p-2 sm:p-4',
                         (pdfViewer.zoom !== 'width' && pdfViewer.zoom !== 'height') ? 'overflow-auto block cursor-grab' : 'overflow-hidden flex items-center justify-center'
                     ]"
-                    class="h-full w-full max-w-4xl mx-auto shadow-sm rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 relative">
+                    class="h-full w-full max-w-7xl 2xl:max-w-[92rem] mx-auto shadow-sm rounded-2xl bg-slate-200/60 dark:bg-slate-900/60 border border-slate-300/60 dark:border-slate-800/80 relative">
                     <!-- Page rendering indicator -->
                     <div x-show="pdfViewer.pageLoading && pdfViewer.scrollMode === 'page'" x-cloak
                         class="absolute top-4 right-4 z-20 bg-slate-800/80 backdrop-blur text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-2 shadow font-bold">
@@ -5103,22 +5128,26 @@
                         <span x-text="t('rendering') || 'Đang vẽ trang...'"></span>
                     </div>
 
-                    <!-- The canvas itself -->
-                    <canvas x-show="pdfViewer.scrollMode === 'page'" id="pdf-canvas"
-                        @dblclick="togglePdfZoom($event)"
-                        :class="pdfViewer.darkModeFilter ? 'pdf-canvas-invert' : ''"
-                        class="shadow-lg transition-transform duration-200 origin-top"></canvas>
+                    <!-- Single Page Mode Canvas -->
+                    <div x-show="pdfViewer.scrollMode === 'page'" class="w-full h-full overflow-auto flex items-center justify-center p-2 sm:p-4">
+                        <div class="bg-white shadow-2xl rounded-sm ring-1 ring-black/10 overflow-hidden">
+                            <canvas id="pdf-canvas"
+                                @dblclick="togglePdfZoom($event)"
+                                :class="pdfViewer.darkModeFilter ? 'pdf-canvas-invert' : ''"
+                                class="transition-transform duration-200 origin-top block bg-white"></canvas>
+                        </div>
+                    </div>
 
                     <!-- Continuous PDF container -->
                     <div id="pdf-continuous-container" x-show="pdfViewer.scrollMode === 'continuous'"
                         @scroll.debounce.50ms="trackPdfContinuousScroll($el)"
-                        class="w-full h-full overflow-y-auto flex flex-col items-center gap-6 py-4 hide-scrollbar select-none bg-slate-100/10">
+                        class="w-full h-full overflow-y-auto flex flex-col items-center gap-6 py-6 px-2 sm:px-4 select-none">
                         <template x-for="pageNum in pdfViewer.numPages" :key="pageNum">
-                            <div class="pdf-page-wrapper bg-white dark:bg-slate-800 shadow-md rounded-md p-1 flex items-center justify-center relative"
+                            <div class="pdf-page-wrapper bg-white shadow-2xl rounded-sm p-0 flex items-center justify-center relative ring-1 ring-black/10 min-h-[350px]"
                                 :data-page="pageNum" x-init="registerPdfLazyPage($el, pageNum)">
                                 <canvas :id="'pdf-canvas-' + pageNum"
                                     :class="pdfViewer.darkModeFilter ? 'pdf-canvas-invert' : ''"
-                                    class="max-w-full origin-top"></canvas>
+                                    class="max-w-full origin-top block bg-white rounded-sm"></canvas>
                             </div>
                         </template>
                     </div>

@@ -5223,7 +5223,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.pdfViewer.autoScrollSpeed = 2;
             
             const isDarkGlobal = document.documentElement.classList.contains('dark');
-            this.pdfViewer.darkModeFilter = isDarkGlobal;
+            this.pdfViewer.darkModeFilter = false; // Always render natural crisp white pages by default; toggle available for night reading
 
             const token = this.shareToken || this.token || shareToken || '';
             const hasShareToken = !!token;
@@ -5356,15 +5356,19 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                         if (savedMode) {
                             this.pdfViewer.scrollMode = savedMode;
                         } else {
-                            this.pdfViewer.scrollMode = 'page';
+                            this.pdfViewer.scrollMode = 'continuous';
                         }
                     } else {
-                        this.pdfViewer.scrollMode = 'page';
+                        this.pdfViewer.scrollMode = 'continuous';
                     }
                     this.pdfViewer.currentPage = startPage;
                     this.pdfViewer.pageProgress = Math.round((startPage / pdfDoc.numPages) * 100);
                     if (this.pdfViewer.scrollMode === 'continuous') {
                         this.$nextTick(() => {
+                            this.renderPdfContinuousPage(startPage);
+                            if (startPage + 1 <= pdfDoc.numPages) {
+                                this.renderPdfContinuousPage(startPage + 1);
+                            }
                             setTimeout(() => {
                                 const container = document.getElementById('pdf-continuous-container') || 
                                                   document.getElementById('share-pdf-continuous-container') || 
@@ -5375,7 +5379,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                                         wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
                                     }
                                 }
-                            }, 300);
+                            }, 150);
                         });
                     } else {
                         this.renderPdfPage(startPage);
@@ -5897,6 +5901,42 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     }, 100);
                 });
             } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        getPdfStreamUrl(file) {
+            if (!file || !file.id) return '#';
+            return `/api/files/${file.id}/stream`;
+        },
+        getPdfDownloadUrl(file) {
+            if (!file || !file.id) return '#';
+            return `/download/${file.id}`;
+        },
+        printPdf() {
+            if (!this.pdfViewer.file) return;
+            const url = this.getPdfStreamUrl(this.pdfViewer.file);
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.src = url;
+            iframe.onload = () => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch(e) {
+                    window.open(url, '_blank');
+                }
+            };
+            document.body.appendChild(iframe);
+            setTimeout(() => { try { document.body.removeChild(iframe); } catch(e){} }, 60000);
+        },
+        togglePdfInvert() {
+            this.pdfViewer.darkModeFilter = !this.pdfViewer.darkModeFilter;
+            if (this.pdfViewer.scrollMode === 'page') {
                 this.renderPdfPage(this.pdfViewer.currentPage);
             }
         },
@@ -8194,7 +8234,7 @@ function shareApp() {
             this.pdfViewer.autoScrollSpeed = 2;
             
             const isDarkGlobal = document.documentElement.classList.contains('dark');
-            this.pdfViewer.darkModeFilter = isDarkGlobal;
+            this.pdfViewer.darkModeFilter = false;
 
             const token = this.shareToken || this.token || shareToken || '';
             const hasShareToken = !!token;
@@ -8327,15 +8367,19 @@ function shareApp() {
                         if (savedMode) {
                             this.pdfViewer.scrollMode = savedMode;
                         } else {
-                            this.pdfViewer.scrollMode = 'page';
+                            this.pdfViewer.scrollMode = 'continuous';
                         }
                     } else {
-                        this.pdfViewer.scrollMode = 'page';
+                        this.pdfViewer.scrollMode = 'continuous';
                     }
                     this.pdfViewer.currentPage = startPage;
                     this.pdfViewer.pageProgress = Math.round((startPage / pdfDoc.numPages) * 100);
                     if (this.pdfViewer.scrollMode === 'continuous') {
                         this.$nextTick(() => {
+                            this.renderPdfContinuousPage(startPage);
+                            if (startPage + 1 <= pdfDoc.numPages) {
+                                this.renderPdfContinuousPage(startPage + 1);
+                            }
                             setTimeout(() => {
                                 const container = document.getElementById('pdf-continuous-container') || 
                                                   document.getElementById('share-pdf-continuous-container') || 
@@ -8346,7 +8390,7 @@ function shareApp() {
                                         wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
                                     }
                                 }
-                            }, 300);
+                            }, 150);
                         });
                     } else {
                         this.renderPdfPage(startPage);
@@ -8865,6 +8909,42 @@ function shareApp() {
                     }, 100);
                 });
             } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        getPdfStreamUrl(file) {
+            if (!file || !file.id) return '#';
+            return `/s/${this.shareToken}/file/${file.id}/stream`;
+        },
+        getPdfDownloadUrl(file) {
+            if (!file || !file.id) return '#';
+            return `/s/${this.shareToken}/file/${file.id}/dl`;
+        },
+        printPdf() {
+            if (!this.pdfViewer.file) return;
+            const url = this.getPdfStreamUrl(this.pdfViewer.file);
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.src = url;
+            iframe.onload = () => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch(e) {
+                    window.open(url, '_blank');
+                }
+            };
+            document.body.appendChild(iframe);
+            setTimeout(() => { try { document.body.removeChild(iframe); } catch(e){} }, 60000);
+        },
+        togglePdfInvert() {
+            this.pdfViewer.darkModeFilter = !this.pdfViewer.darkModeFilter;
+            if (this.pdfViewer.scrollMode === 'page') {
                 this.renderPdfPage(this.pdfViewer.currentPage);
             }
         },
@@ -9935,7 +10015,7 @@ function shareFileApp() {
             this.pdfViewer.autoScrollSpeed = 2;
             
             const isDarkGlobal = document.documentElement.classList.contains('dark');
-            this.pdfViewer.darkModeFilter = isDarkGlobal;
+            this.pdfViewer.darkModeFilter = false;
 
             const token = this.shareToken || this.token || shareToken || '';
             const hasShareToken = !!token;
@@ -10064,15 +10144,19 @@ function shareFileApp() {
                         if (savedMode) {
                             this.pdfViewer.scrollMode = savedMode;
                         } else {
-                            this.pdfViewer.scrollMode = 'page';
+                            this.pdfViewer.scrollMode = 'continuous';
                         }
                     } else {
-                        this.pdfViewer.scrollMode = 'page';
+                        this.pdfViewer.scrollMode = 'continuous';
                     }
                     this.pdfViewer.currentPage = startPage;
                     this.pdfViewer.pageProgress = Math.round((startPage / pdfDoc.numPages) * 100);
                     if (this.pdfViewer.scrollMode === 'continuous') {
                         this.$nextTick(() => {
+                            this.renderPdfContinuousPage(startPage);
+                            if (startPage + 1 <= pdfDoc.numPages) {
+                                this.renderPdfContinuousPage(startPage + 1);
+                            }
                             setTimeout(() => {
                                 const container = document.getElementById('pdf-continuous-container') || 
                                                   document.getElementById('share-pdf-continuous-container') || 
@@ -10083,7 +10167,7 @@ function shareFileApp() {
                                         wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
                                     }
                                 }
-                            }, 300);
+                            }, 150);
                         });
                     } else {
                         this.renderPdfPage(startPage);
@@ -10602,6 +10686,39 @@ function shareFileApp() {
                     }, 100);
                 });
             } else {
+                this.renderPdfPage(this.pdfViewer.currentPage);
+            }
+        },
+        getPdfStreamUrl(file) {
+            return `/s/${this.token}/stream`;
+        },
+        getPdfDownloadUrl(file) {
+            return `/s/${this.token}/dl`;
+        },
+        printPdf() {
+            const url = this.getPdfStreamUrl(this.pdfViewer.file);
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.src = url;
+            iframe.onload = () => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch(e) {
+                    window.open(url, '_blank');
+                }
+            };
+            document.body.appendChild(iframe);
+            setTimeout(() => { try { document.body.removeChild(iframe); } catch(e){} }, 60000);
+        },
+        togglePdfInvert() {
+            this.pdfViewer.darkModeFilter = !this.pdfViewer.darkModeFilter;
+            if (this.pdfViewer.scrollMode === 'page') {
                 this.renderPdfPage(this.pdfViewer.currentPage);
             }
         },
