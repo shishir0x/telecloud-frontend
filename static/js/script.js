@@ -63,6 +63,24 @@ async function ensurePdfLoaded() {
     });
 }
 
+// Popup-blocker / WebView-safe "open in new tab".
+// window.open() is silently dropped by popup blockers and by most in-app
+// WebViews, which is why the PDF "Open in Tab" button appeared to do nothing.
+// Injecting and clicking a real <a target="_blank"> counts as a user-initiated
+// navigation instead of a popup, so it works where window.open() is ignored.
+function openUrlInNewTab(url) {
+    if (!url) return false;
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+}
+
 const artplayerI18n = {
     'vi': {
         'Play': 'Phát',
@@ -1694,7 +1712,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         },
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
-        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false, bubbleMode: false, isDragging: false },
         modal: { show: false, type: 'alert', title: '', message: '', input: '', resolve: null, isDanger: false, inputType: 'text', applyToAll: false },
@@ -5215,6 +5233,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.pdfViewer.sidebarOpen = false;
             this.pdfViewer.zoom = 'width';
             this.pdfViewer.pageProgress = 0;
+            this.pdfViewer.loadProgress = 0;
             this.pdfViewer.currentPage = 1;
             this.pdfViewer.numPages = 0;
             this.pdfViewer.settingsOpen = false;
@@ -5236,7 +5255,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     downloadUrl = `/s/${token}/stream`;
                 }
             } else {
-                downloadUrl = `/download/${file.id}`;
+                downloadUrl = this.getPdfStreamUrl(file);
             }
 
             if (window._pdfLoadingTask) {
@@ -5284,7 +5303,17 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.$nextTick(async () => {
                 try {
                     await ensurePdfLoaded();
-                    const loadingTask = pdfjsLib.getDocument({ url: downloadUrl, withCredentials: true });
+                    const loadingTask = pdfjsLib.getDocument({
+                        url: downloadUrl,
+                        withCredentials: true,
+                        // Bigger chunks = fewer round-trips while streaming large PDFs
+                        rangeChunkSize: 262144
+                    });
+                    loadingTask.onProgress = (data) => {
+                        if (data && data.total) {
+                            this.pdfViewer.loadProgress = Math.min(100, Math.round((data.loaded / data.total) * 100));
+                        }
+                    };
                     window._pdfLoadingTask = loadingTask;
                     
                     const pdfDoc = await loadingTask.promise;
@@ -5631,7 +5660,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             };
             
             container._pdfPinchStart = (e) => {
-                if (this.pdfViewer.scrollMode !== 'page') return;
+                // Pinch-to-zoom works in both page and continuous modes
                 if (e.touches.length === 2) {
                     isPinching = true;
                     initialDist = getTouchDist(e.touches);
@@ -5648,7 +5677,6 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             };
             
             container._pdfPinchMove = (e) => {
-                if (this.pdfViewer.scrollMode !== 'page') return;
                 if (e.touches.length === 2 && isPinching) {
                     e.preventDefault();
                     const dist = getTouchDist(e.touches);
@@ -5656,11 +5684,13 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     const newZoom = Math.min(300, Math.max(50, Math.round(initialZoom * ratio / 25) * 25));
                     if (newZoom !== this.pdfViewer.zoom) {
                         this.pdfSetZoom(newZoom);
-                        this.$nextTick(() => {
-                            this._setupPdfDragPan(container, newZoom);
-                        });
+                        if (this.pdfViewer.scrollMode === 'page') {
+                            this.$nextTick(() => {
+                                this._setupPdfDragPan(container, newZoom);
+                            });
+                        }
                     }
-                } else if (e.touches.length === 1 && !isPinching) {
+                } else if (this.pdfViewer.scrollMode === 'page' && e.touches.length === 1 && !isPinching) {
                     // Single finger scroll when zoomed in
                     const z = this.pdfViewer.zoom;
                     const curZoom = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
@@ -5674,7 +5704,27 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 }
             };
             
-            container._pdfPinchEnd = () => { isPinching = false; };
+            container._pdfPinchEnd = (e) => {
+                isPinching = false;
+                const t = (e && e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
+                if (!t) { container._pdfLastTap = 0; return; }
+                const movedX = Math.abs(t.clientX - touchScrollStartX);
+                const movedY = Math.abs(t.clientY - touchScrollStartY);
+                if (movedX > 12 || movedY > 12) { container._pdfLastTap = 0; return; }
+                const now = Date.now();
+                // Double-tap toggles between fit-width and 200% zoom
+                if (container._pdfLastTap && (now - container._pdfLastTap) < 300) {
+                    container._pdfLastTap = 0;
+                    const z = this.pdfViewer.zoom;
+                    const cur = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
+                    this.pdfSetZoom(cur >= 200 ? 'width' : 200);
+                    if (this.pdfViewer.scrollMode === 'page') {
+                        this.$nextTick(() => this._setupPdfDragPan(container, this.pdfViewer.zoom));
+                    }
+                } else {
+                    container._pdfLastTap = now;
+                }
+            };
             
             container.addEventListener('touchstart', container._pdfPinchStart, { passive: false });
             container.addEventListener('touchmove', container._pdfPinchMove, { passive: false });
@@ -5722,6 +5772,17 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     });
                 }
             }
+        },
+        seekPdfProgress(event) {
+            if (!this.pdfViewer.numPages) return;
+            // Ignore keyboard-activated clicks (detail === 0): they carry no position
+            if (!event.detail) return;
+            const el = event.currentTarget || event.target;
+            const rect = el.getBoundingClientRect();
+            if (!rect.width) return;
+            const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+            const page = Math.max(1, Math.min(this.pdfViewer.numPages, Math.ceil(ratio * this.pdfViewer.numPages)));
+            this.pdfJumpToPage(page);
         },
         closePdfViewer() {
             if (window._pdfIntersectionObserver) {
@@ -5913,7 +5974,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             if (!file || !file.id) return;
             const url = this.getPdfStreamUrl(file);
             if (url) {
-                window.open(url, '_blank');
+                openUrlInNewTab(url);
             }
         },
         getPdfDownloadUrl(file) {
@@ -5936,7 +5997,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     iframe.contentWindow.focus();
                     iframe.contentWindow.print();
                 } catch(e) {
-                    window.open(url, '_blank');
+                    openUrlInNewTab(url);
                 }
             };
             document.body.appendChild(iframe);
@@ -5951,6 +6012,8 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         async showFileInfo(file) {
             if (file.is_folder) return;
             const typeData = this.getFileTypeData(file.filename);
+            // Warm up PDF.js while the user reads the file info dialog
+            if (typeData.n === 'type_pdf') { ensurePdfLoaded().catch(() => {}); }
             const ext = file.filename.split('.').pop().toLowerCase();
             const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif'];
             const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'ogv', '3gp', 'flv', 'wmv'];
@@ -6573,7 +6636,7 @@ function shareApp() {
         },
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
-        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false, bubbleMode: false, isDragging: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
@@ -8234,6 +8297,7 @@ function shareApp() {
             this.pdfViewer.sidebarOpen = false;
             this.pdfViewer.zoom = 'width';
             this.pdfViewer.pageProgress = 0;
+            this.pdfViewer.loadProgress = 0;
             this.pdfViewer.currentPage = 1;
             this.pdfViewer.numPages = 0;
             this.pdfViewer.settingsOpen = false;
@@ -8255,7 +8319,7 @@ function shareApp() {
                     downloadUrl = `/s/${token}/stream`;
                 }
             } else {
-                downloadUrl = `/download/${file.id}`;
+                downloadUrl = this.getPdfStreamUrl(file);
             }
 
             if (window._pdfLoadingTask) {
@@ -8303,7 +8367,17 @@ function shareApp() {
             this.$nextTick(async () => {
                 try {
                     await ensurePdfLoaded();
-                    const loadingTask = pdfjsLib.getDocument({ url: downloadUrl, withCredentials: true });
+                    const loadingTask = pdfjsLib.getDocument({
+                        url: downloadUrl,
+                        withCredentials: true,
+                        // Bigger chunks = fewer round-trips while streaming large PDFs
+                        rangeChunkSize: 262144
+                    });
+                    loadingTask.onProgress = (data) => {
+                        if (data && data.total) {
+                            this.pdfViewer.loadProgress = Math.min(100, Math.round((data.loaded / data.total) * 100));
+                        }
+                    };
                     window._pdfLoadingTask = loadingTask;
                     
                     const pdfDoc = await loadingTask.promise;
@@ -8648,7 +8722,7 @@ function shareApp() {
             };
             
             container._pdfPinchStart = (e) => {
-                if (this.pdfViewer.scrollMode !== 'page') return;
+                // Pinch-to-zoom works in both page and continuous modes
                 if (e.touches.length === 2) {
                     isPinching = true;
                     initialDist = getTouchDist(e.touches);
@@ -8665,7 +8739,6 @@ function shareApp() {
             };
             
             container._pdfPinchMove = (e) => {
-                if (this.pdfViewer.scrollMode !== 'page') return;
                 if (e.touches.length === 2 && isPinching) {
                     e.preventDefault();
                     const dist = getTouchDist(e.touches);
@@ -8673,11 +8746,13 @@ function shareApp() {
                     const newZoom = Math.min(300, Math.max(50, Math.round(initialZoom * ratio / 25) * 25));
                     if (newZoom !== this.pdfViewer.zoom) {
                         this.pdfSetZoom(newZoom);
-                        this.$nextTick(() => {
-                            this._setupPdfDragPan(container, newZoom);
-                        });
+                        if (this.pdfViewer.scrollMode === 'page') {
+                            this.$nextTick(() => {
+                                this._setupPdfDragPan(container, newZoom);
+                            });
+                        }
                     }
-                } else if (e.touches.length === 1 && !isPinching) {
+                } else if (this.pdfViewer.scrollMode === 'page' && e.touches.length === 1 && !isPinching) {
                     const z = this.pdfViewer.zoom;
                     const curZoom = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
                     if (curZoom > 100) {
@@ -8690,7 +8765,27 @@ function shareApp() {
                 }
             };
             
-            container._pdfPinchEnd = () => { isPinching = false; };
+            container._pdfPinchEnd = (e) => {
+                isPinching = false;
+                const t = (e && e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
+                if (!t) { container._pdfLastTap = 0; return; }
+                const movedX = Math.abs(t.clientX - touchScrollStartX);
+                const movedY = Math.abs(t.clientY - touchScrollStartY);
+                if (movedX > 12 || movedY > 12) { container._pdfLastTap = 0; return; }
+                const now = Date.now();
+                // Double-tap toggles between fit-width and 200% zoom
+                if (container._pdfLastTap && (now - container._pdfLastTap) < 300) {
+                    container._pdfLastTap = 0;
+                    const z = this.pdfViewer.zoom;
+                    const cur = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
+                    this.pdfSetZoom(cur >= 200 ? 'width' : 200);
+                    if (this.pdfViewer.scrollMode === 'page') {
+                        this.$nextTick(() => this._setupPdfDragPan(container, this.pdfViewer.zoom));
+                    }
+                } else {
+                    container._pdfLastTap = now;
+                }
+            };
             
             container.addEventListener('touchstart', container._pdfPinchStart, { passive: false });
             container.addEventListener('touchmove', container._pdfPinchMove, { passive: false });
@@ -8738,6 +8833,17 @@ function shareApp() {
                     });
                 }
             }
+        },
+        seekPdfProgress(event) {
+            if (!this.pdfViewer.numPages) return;
+            // Ignore keyboard-activated clicks (detail === 0): they carry no position
+            if (!event.detail) return;
+            const el = event.currentTarget || event.target;
+            const rect = el.getBoundingClientRect();
+            if (!rect.width) return;
+            const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+            const page = Math.max(1, Math.min(this.pdfViewer.numPages, Math.ceil(ratio * this.pdfViewer.numPages)));
+            this.pdfJumpToPage(page);
         },
         closePdfViewer() {
             if (window._pdfIntersectionObserver) {
@@ -8929,7 +9035,7 @@ function shareApp() {
             if (!file || !file.id) return;
             const url = this.getPdfStreamUrl(file);
             if (url) {
-                window.open(url, '_blank');
+                openUrlInNewTab(url);
             }
         },
         getPdfDownloadUrl(file) {
@@ -8952,7 +9058,7 @@ function shareApp() {
                     iframe.contentWindow.focus();
                     iframe.contentWindow.print();
                 } catch(e) {
-                    window.open(url, '_blank');
+                    openUrlInNewTab(url);
                 }
             };
             document.body.appendChild(iframe);
@@ -8967,6 +9073,8 @@ function shareApp() {
         async showFileInfo(file) {
             if (file.is_folder) return;
             const typeData = this.getFileTypeData(file.filename);
+            // Warm up PDF.js while the user reads the file info dialog
+            if (typeData.n === 'type_pdf') { ensurePdfLoaded().catch(() => {}); }
             const ext = file.filename.split('.').pop().toLowerCase();
             const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif'];
             const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'ogv', '3gp', 'flv', 'wmv'];
@@ -9066,7 +9174,7 @@ function shareFileApp() {
         lightboxLoading: false,
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
-        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         toastModal: { show: false, message: '', type: 'success', persistent: false },
         toastTimeout: null,
         
@@ -10023,6 +10131,7 @@ function shareFileApp() {
             this.pdfViewer.sidebarOpen = false;
             this.pdfViewer.zoom = 'width';
             this.pdfViewer.pageProgress = 0;
+            this.pdfViewer.loadProgress = 0;
             this.pdfViewer.currentPage = 1;
             this.pdfViewer.numPages = 0;
             this.pdfViewer.settingsOpen = false;
@@ -10040,7 +10149,7 @@ function shareFileApp() {
             if (hasShareToken) {
                 downloadUrl = `/s/${token}/stream`;
             } else {
-                downloadUrl = `/download/${file.id}`;
+                downloadUrl = this.getPdfStreamUrl(file);
             }
 
             if (window._pdfLoadingTask) {
@@ -10088,7 +10197,17 @@ function shareFileApp() {
             this.$nextTick(async () => {
                 try {
                     await ensurePdfLoaded();
-                    const loadingTask = pdfjsLib.getDocument({ url: downloadUrl, withCredentials: true });
+                    const loadingTask = pdfjsLib.getDocument({
+                        url: downloadUrl,
+                        withCredentials: true,
+                        // Bigger chunks = fewer round-trips while streaming large PDFs
+                        rangeChunkSize: 262144
+                    });
+                    loadingTask.onProgress = (data) => {
+                        if (data && data.total) {
+                            this.pdfViewer.loadProgress = Math.min(100, Math.round((data.loaded / data.total) * 100));
+                        }
+                    };
                     window._pdfLoadingTask = loadingTask;
                     
                     const pdfDoc = await loadingTask.promise;
@@ -10433,7 +10552,7 @@ function shareFileApp() {
             };
             
             container._pdfPinchStart = (e) => {
-                if (this.pdfViewer.scrollMode !== 'page') return;
+                // Pinch-to-zoom works in both page and continuous modes
                 if (e.touches.length === 2) {
                     isPinching = true;
                     initialDist = getTouchDist(e.touches);
@@ -10450,7 +10569,6 @@ function shareFileApp() {
             };
             
             container._pdfPinchMove = (e) => {
-                if (this.pdfViewer.scrollMode !== 'page') return;
                 if (e.touches.length === 2 && isPinching) {
                     e.preventDefault();
                     const dist = getTouchDist(e.touches);
@@ -10458,11 +10576,13 @@ function shareFileApp() {
                     const newZoom = Math.min(300, Math.max(50, Math.round(initialZoom * ratio / 25) * 25));
                     if (newZoom !== this.pdfViewer.zoom) {
                         this.pdfSetZoom(newZoom);
-                        this.$nextTick(() => {
-                            this._setupPdfDragPan(container, newZoom);
-                        });
+                        if (this.pdfViewer.scrollMode === 'page') {
+                            this.$nextTick(() => {
+                                this._setupPdfDragPan(container, newZoom);
+                            });
+                        }
                     }
-                } else if (e.touches.length === 1 && !isPinching) {
+                } else if (this.pdfViewer.scrollMode === 'page' && e.touches.length === 1 && !isPinching) {
                     const z = this.pdfViewer.zoom;
                     const curZoom = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
                     if (curZoom > 100) {
@@ -10475,7 +10595,27 @@ function shareFileApp() {
                 }
             };
             
-            container._pdfPinchEnd = () => { isPinching = false; };
+            container._pdfPinchEnd = (e) => {
+                isPinching = false;
+                const t = (e && e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
+                if (!t) { container._pdfLastTap = 0; return; }
+                const movedX = Math.abs(t.clientX - touchScrollStartX);
+                const movedY = Math.abs(t.clientY - touchScrollStartY);
+                if (movedX > 12 || movedY > 12) { container._pdfLastTap = 0; return; }
+                const now = Date.now();
+                // Double-tap toggles between fit-width and 200% zoom
+                if (container._pdfLastTap && (now - container._pdfLastTap) < 300) {
+                    container._pdfLastTap = 0;
+                    const z = this.pdfViewer.zoom;
+                    const cur = (z === 'width' || z === 'height') ? 100 : (parseInt(z) || 100);
+                    this.pdfSetZoom(cur >= 200 ? 'width' : 200);
+                    if (this.pdfViewer.scrollMode === 'page') {
+                        this.$nextTick(() => this._setupPdfDragPan(container, this.pdfViewer.zoom));
+                    }
+                } else {
+                    container._pdfLastTap = now;
+                }
+            };
             
             container.addEventListener('touchstart', container._pdfPinchStart, { passive: false });
             container.addEventListener('touchmove', container._pdfPinchMove, { passive: false });
@@ -10523,6 +10663,17 @@ function shareFileApp() {
                     });
                 }
             }
+        },
+        seekPdfProgress(event) {
+            if (!this.pdfViewer.numPages) return;
+            // Ignore keyboard-activated clicks (detail === 0): they carry no position
+            if (!event.detail) return;
+            const el = event.currentTarget || event.target;
+            const rect = el.getBoundingClientRect();
+            if (!rect.width) return;
+            const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+            const page = Math.max(1, Math.min(this.pdfViewer.numPages, Math.ceil(ratio * this.pdfViewer.numPages)));
+            this.pdfJumpToPage(page);
         },
         closePdfViewer() {
             if (window._pdfIntersectionObserver) {
@@ -10712,7 +10863,7 @@ function shareFileApp() {
         openPdfInNewTab(file) {
             const url = this.getPdfStreamUrl(file || { filename: this.filename });
             if (url) {
-                window.open(url, '_blank');
+                openUrlInNewTab(url);
             }
         },
         getPdfDownloadUrl(file) {
@@ -10733,7 +10884,7 @@ function shareFileApp() {
                     iframe.contentWindow.focus();
                     iframe.contentWindow.print();
                 } catch(e) {
-                    window.open(url, '_blank');
+                    openUrlInNewTab(url);
                 }
             };
             document.body.appendChild(iframe);
@@ -10785,6 +10936,8 @@ function shareFileApp() {
                     container.innerHTML = result.i.replace('text-2xl', 'text-5xl');
                 }
                 this.typeKey = result.n;
+                // Warm up PDF.js while the share page settles
+                if (this.typeKey === 'type_pdf') { ensurePdfLoaded().catch(() => {}); }
                 this.typeExt = result.ext || '';
 
                 const imgExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif'];

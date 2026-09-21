@@ -1285,7 +1285,7 @@
                     class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white dark:bg-slate-900 z-10">
                     <div class="w-14 h-14 rounded-full border-4 border-red-500/20 border-t-red-500 animate-spin"></div>
                     <p class="text-sm font-bold text-slate-700 dark:text-slate-200 truncate max-w-[80%] text-center" x-text="pdfViewer.file?.filename"></p>
-                    <p class="text-xs text-slate-400 font-medium animate-pulse" x-text="t('loading')"></p>
+                    <p class="text-xs text-slate-400 font-medium animate-pulse" x-text="pdfViewer.loadProgress > 0 ? pdfViewer.loadProgress + '%' : t('loading')"></p>
                 </div>
 
                 <!-- pdf-viewer-area Container -->
@@ -1339,7 +1339,10 @@
 
             <!-- Progress bar -->
             <div class="flex-1 flex items-center gap-3">
-                <div class="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2 relative overflow-hidden">
+                <div class="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-3 sm:h-2 relative overflow-hidden cursor-pointer touch-none"
+                    @click="seekPdfProgress($event)" role="slider" tabindex="0"
+                    :aria-valuenow="pdfViewer.currentPage" :aria-valuemin="1" :aria-valuemax="pdfViewer.numPages"
+                    title="Jump to page">
                     <div class="bg-gradient-to-r from-red-500 to-rose-600 h-full rounded-full transition-all duration-300"
                         :style="`width: ${pdfViewer.pageProgress}%`"></div>
                 </div>
@@ -1348,6 +1351,7 @@
                         :value="pdfViewer.currentPage" 
                         @change="const p = parseInt($event.target.value, 10); if(p >= 1 && p <= pdfViewer.numPages) { pdfJumpToPage(p); } else { $event.target.value = pdfViewer.currentPage; }"
                         class="w-12 text-center py-0.5 text-xs font-bold font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-red-500"
+                        inputmode="numeric"
                         min="1" 
                         :max="pdfViewer.numPages">
                     <span class="text-xs font-bold font-mono text-slate-500 dark:text-slate-400">/ <span x-text="pdfViewer.numPages"></span></span>
