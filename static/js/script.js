@@ -5905,8 +5905,16 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             }
         },
         getPdfStreamUrl(file) {
-            if (!file || !file.id) return '#';
-            return `/api/files/${file.id}/stream`;
+            if (!file || !file.id) return '';
+            const filename = file.filename ? encodeURIComponent(file.filename) : 'document.pdf';
+            return `/api/files/${file.id}/stream/${filename}`;
+        },
+        openPdfInNewTab(file) {
+            if (!file || !file.id) return;
+            const url = this.getPdfStreamUrl(file);
+            if (url) {
+                window.open(url, '_blank');
+            }
         },
         getPdfDownloadUrl(file) {
             if (!file || !file.id) return '#';
@@ -8913,8 +8921,16 @@ function shareApp() {
             }
         },
         getPdfStreamUrl(file) {
-            if (!file || !file.id) return '#';
-            return `/s/${this.shareToken}/file/${file.id}/stream`;
+            if (!file || !file.id) return '';
+            const filename = file.filename ? encodeURIComponent(file.filename) : 'document.pdf';
+            return `/s/${this.shareToken}/file/${file.id}/stream/${filename}`;
+        },
+        openPdfInNewTab(file) {
+            if (!file || !file.id) return;
+            const url = this.getPdfStreamUrl(file);
+            if (url) {
+                window.open(url, '_blank');
+            }
         },
         getPdfDownloadUrl(file) {
             if (!file || !file.id) return '#';
@@ -10690,7 +10706,14 @@ function shareFileApp() {
             }
         },
         getPdfStreamUrl(file) {
-            return `/s/${this.token}/stream`;
+            const filename = (file && file.filename) ? file.filename : (this.filename || 'document.pdf');
+            return `/s/${this.token}/stream/${encodeURIComponent(filename)}`;
+        },
+        openPdfInNewTab(file) {
+            const url = this.getPdfStreamUrl(file || { filename: this.filename });
+            if (url) {
+                window.open(url, '_blank');
+            }
         },
         getPdfDownloadUrl(file) {
             return `/s/${this.token}/dl`;
