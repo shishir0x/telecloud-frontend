@@ -1730,7 +1730,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         },
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
-        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'continuous' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false, bubbleMode: false, isDragging: false },
         modal: { show: false, type: 'alert', title: '', message: '', input: '', resolve: null, isDanger: false, inputType: 'text', applyToAll: false },
@@ -5258,6 +5258,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.pdfViewer.toc = [];
             this.pdfViewer.autoScrollActive = false;
             this.pdfViewer.autoScrollSpeed = 2;
+            this.pdfViewer.scrollMode = 'continuous';
             
             const isDarkGlobal = document.documentElement.classList.contains('dark');
 
@@ -5756,20 +5757,28 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         },
         pdfNextPage() {
             if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
-                this.renderPdfPage(this.pdfViewer.currentPage + 1);
-                this.$nextTick(() => {
-                    const area = document.getElementById('pdf-viewer-area');
-                    if (area) area.scrollTop = 0;
-                });
+                if (this.pdfViewer.scrollMode === 'continuous') {
+                    this.pdfJumpToPage(this.pdfViewer.currentPage + 1);
+                } else {
+                    this.renderPdfPage(this.pdfViewer.currentPage + 1);
+                    this.$nextTick(() => {
+                        const area = document.getElementById('pdf-viewer-area');
+                        if (area) area.scrollTop = 0;
+                    });
+                }
             }
         },
         pdfPrevPage() {
             if (this.pdfViewer.currentPage > 1) {
-                this.renderPdfPage(this.pdfViewer.currentPage - 1);
-                this.$nextTick(() => {
-                    const area = document.getElementById('pdf-viewer-area');
-                    if (area) area.scrollTop = 0;
-                });
+                if (this.pdfViewer.scrollMode === 'continuous') {
+                    this.pdfJumpToPage(this.pdfViewer.currentPage - 1);
+                } else {
+                    this.renderPdfPage(this.pdfViewer.currentPage - 1);
+                    this.$nextTick(() => {
+                        const area = document.getElementById('pdf-viewer-area');
+                        if (area) area.scrollTop = 0;
+                    });
+                }
             }
         },
         pdfJumpToPage(page) {
@@ -5842,6 +5851,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 this.pdfViewer.file = null;
                 this.pdfViewer.toc = [];
                 this.pdfViewer.settingsOpen = false;
+                this.pdfViewer.scrollMode = 'continuous';
             }, 400);
         },
         togglePdfAutoScroll() {
@@ -6654,7 +6664,7 @@ function shareApp() {
         },
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
-        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'continuous' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false, bubbleMode: false, isDragging: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
@@ -8322,6 +8332,7 @@ function shareApp() {
             this.pdfViewer.toc = [];
             this.pdfViewer.autoScrollActive = false;
             this.pdfViewer.autoScrollSpeed = 2;
+            this.pdfViewer.scrollMode = 'continuous';
             
             const isDarkGlobal = document.documentElement.classList.contains('dark');
 
@@ -8817,20 +8828,28 @@ function shareApp() {
         },
         pdfNextPage() {
             if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
-                this.renderPdfPage(this.pdfViewer.currentPage + 1);
-                this.$nextTick(() => {
-                    const area = document.getElementById('pdf-viewer-area');
-                    if (area) area.scrollTop = 0;
-                });
+                if (this.pdfViewer.scrollMode === 'continuous') {
+                    this.pdfJumpToPage(this.pdfViewer.currentPage + 1);
+                } else {
+                    this.renderPdfPage(this.pdfViewer.currentPage + 1);
+                    this.$nextTick(() => {
+                        const area = document.getElementById('pdf-viewer-area');
+                        if (area) area.scrollTop = 0;
+                    });
+                }
             }
         },
         pdfPrevPage() {
             if (this.pdfViewer.currentPage > 1) {
-                this.renderPdfPage(this.pdfViewer.currentPage - 1);
-                this.$nextTick(() => {
-                    const area = document.getElementById('pdf-viewer-area');
-                    if (area) area.scrollTop = 0;
-                });
+                if (this.pdfViewer.scrollMode === 'continuous') {
+                    this.pdfJumpToPage(this.pdfViewer.currentPage - 1);
+                } else {
+                    this.renderPdfPage(this.pdfViewer.currentPage - 1);
+                    this.$nextTick(() => {
+                        const area = document.getElementById('pdf-viewer-area');
+                        if (area) area.scrollTop = 0;
+                    });
+                }
             }
         },
         pdfJumpToPage(page) {
@@ -8903,6 +8922,7 @@ function shareApp() {
                 this.pdfViewer.file = null;
                 this.pdfViewer.toc = [];
                 this.pdfViewer.settingsOpen = false;
+                this.pdfViewer.scrollMode = 'continuous';
             }, 400);
         },
         togglePdfAutoScroll() {
@@ -9192,7 +9212,7 @@ function shareFileApp() {
         lightboxLoading: false,
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
-        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'continuous' },
         toastModal: { show: false, message: '', type: 'success', persistent: false },
         toastTimeout: null,
         
@@ -10156,6 +10176,7 @@ function shareFileApp() {
             this.pdfViewer.toc = [];
             this.pdfViewer.autoScrollActive = false;
             this.pdfViewer.autoScrollSpeed = 2;
+            this.pdfViewer.scrollMode = 'continuous';
             
             const isDarkGlobal = document.documentElement.classList.contains('dark');
 
@@ -10647,20 +10668,28 @@ function shareFileApp() {
         },
         pdfNextPage() {
             if (this.pdfViewer.currentPage < this.pdfViewer.numPages) {
-                this.renderPdfPage(this.pdfViewer.currentPage + 1);
-                this.$nextTick(() => {
-                    const area = document.getElementById('pdf-viewer-area');
-                    if (area) area.scrollTop = 0;
-                });
+                if (this.pdfViewer.scrollMode === 'continuous') {
+                    this.pdfJumpToPage(this.pdfViewer.currentPage + 1);
+                } else {
+                    this.renderPdfPage(this.pdfViewer.currentPage + 1);
+                    this.$nextTick(() => {
+                        const area = document.getElementById('pdf-viewer-area');
+                        if (area) area.scrollTop = 0;
+                    });
+                }
             }
         },
         pdfPrevPage() {
             if (this.pdfViewer.currentPage > 1) {
-                this.renderPdfPage(this.pdfViewer.currentPage - 1);
-                this.$nextTick(() => {
-                    const area = document.getElementById('pdf-viewer-area');
-                    if (area) area.scrollTop = 0;
-                });
+                if (this.pdfViewer.scrollMode === 'continuous') {
+                    this.pdfJumpToPage(this.pdfViewer.currentPage - 1);
+                } else {
+                    this.renderPdfPage(this.pdfViewer.currentPage - 1);
+                    this.$nextTick(() => {
+                        const area = document.getElementById('pdf-viewer-area');
+                        if (area) area.scrollTop = 0;
+                    });
+                }
             }
         },
         pdfJumpToPage(page) {
@@ -10733,6 +10762,7 @@ function shareFileApp() {
                 this.pdfViewer.file = null;
                 this.pdfViewer.toc = [];
                 this.pdfViewer.settingsOpen = false;
+                this.pdfViewer.scrollMode = 'continuous';
             }, 400);
         },
         togglePdfAutoScroll() {

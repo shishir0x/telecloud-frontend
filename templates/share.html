@@ -1179,8 +1179,17 @@
                  </button>
              </div>
 
-             <!-- Actions: Auto-scroll, Download -->
+             <!-- Actions: Scroll Mode, Auto-scroll, Download -->
              <div class="flex items-center gap-2">
+                 <!-- Scroll Mode Toggle -->
+                 <button @click.stop="togglePdfScrollMode()"
+                     class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
+                     :class="pdfViewer.scrollMode === 'continuous' ? 'text-violet-600 dark:text-violet-400 bg-slate-100 dark:bg-slate-700' : ''"
+                     :title="pdfViewer.scrollMode === 'page' ? t('scroll_continuous') : t('scroll_page')">
+                     <i class="fa-solid text-sm"
+                         :class="pdfViewer.scrollMode === 'page' ? 'fa-scroll' : 'fa-file-lines'"></i>
+                 </button>
+
                  <!-- Auto scroll play/pause -->
                  <button @click="togglePdfAutoScroll()"
                      class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
