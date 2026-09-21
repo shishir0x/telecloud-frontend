@@ -301,7 +301,7 @@
                                 <template x-if="!file.is_folder">
                                     <div class="w-full h-full relative flex items-center justify-center">
                                         <template x-if="file.has_thumb">
-                                            <img :src="`/api/files/${file.id}/thumb`" loading="lazy" alt="thumb" class="w-full h-full object-cover rounded-xl shadow-sm">
+                                            <img :src="`/api/files/${file.id}/thumb`" loading="lazy" alt="thumb" class="w-full h-full object-cover rounded-xl shadow-sm" @error="file.has_thumb = false">
                                         </template>
                                         <template x-if="!file.has_thumb">
                                             <div x-html="getFileTypeData(file.filename).i" class="scale-75 opacity-80" :class="getFileTypeData(file.filename).c.split(' ')[1]"></div>
@@ -2937,7 +2937,8 @@
                                                         <template x-if="file.has_thumb">
                                                             <img :src="`/api/files/${file.id}/thumb`" loading="lazy"
                                                                 alt="thumb"
-                                                                class="w-full h-full object-cover rounded-xl shadow-sm">
+                                                                class="w-full h-full object-cover rounded-xl shadow-sm"
+                                                                @error="file.has_thumb = false">
                                                         </template>
                                                         <template x-if="!file.has_thumb">
                                                             <div x-html="getFileTypeData(file).i"></div>
@@ -3093,7 +3094,8 @@
                                                                 <template x-if="file.has_thumb">
                                                                     <img :src="`/api/files/${file.id}/thumb`"
                                                                         loading="lazy" alt="thumb"
-                                                                        class="w-full h-full object-cover rounded-xl shadow-sm">
+                                                                        class="w-full h-full object-cover rounded-xl shadow-sm"
+                                                                        @error="file.has_thumb = false">
                                                                 </template>
                                                                 <template x-if="!file.has_thumb">
                                                                     <div x-html="getFileTypeData(file.filename).i"
@@ -3375,7 +3377,8 @@
                                                             <template x-if="file.has_thumb">
                                                                 <img :src="`/api/files/${file.id}/thumb`" loading="lazy"
                                                                     alt="thumb"
-                                                                    class="w-full h-full object-cover rounded-2xl shadow-sm">
+                                                                    class="w-full h-full object-cover rounded-2xl shadow-sm"
+                                                                    @error="file.has_thumb = false">
                                                             </template>
                                                             <template x-if="!file.has_thumb">
                                                                 <div x-html="getFileTypeData(file.filename).i"
