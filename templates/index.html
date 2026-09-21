@@ -3098,6 +3098,7 @@
                                                                 <template x-if="file.has_thumb && !thumbFailed">
                                                                     <img :src="`/api/files/${file.id}/thumb`"
                                                                         alt="thumb"
+                                                                        loading="lazy"
                                                                         class="absolute inset-0 w-full h-full object-cover rounded-xl shadow-sm transition-opacity duration-300"
                                                                         :class="thumbLoaded ? 'opacity-100' : 'opacity-0'"
                                                                         @load="thumbLoaded = true"
@@ -3381,6 +3382,7 @@
                                                             <template x-if="file.has_thumb && !thumbFailed">
                                                                 <img :src="`/api/files/${file.id}/thumb`"
                                                                     alt="thumb"
+                                                                    loading="lazy"
                                                                     class="absolute inset-0 w-full h-full object-cover rounded-2xl shadow-sm transition-opacity duration-300"
                                                                     :class="thumbLoaded ? 'opacity-100' : 'opacity-0'"
                                                                     @load="thumbLoaded = true"

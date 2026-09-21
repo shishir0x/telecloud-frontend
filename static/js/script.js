@@ -1609,7 +1609,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             }
         },
         get totalPages() {
-            return Math.ceil(this.filteredFiles.length / this.itemsPerPage) || 1;
+            return 1;
         },
         get filteredTrashFiles() {
             if (!this.trashSearchQuery) return this.trashFiles;
@@ -1636,9 +1636,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             return this.filteredSharedLinks.slice(start, start + this.sharedLinksItemsPerPage);
         },
         get displayedFiles() {
-            const start = (this.currentPage - 1) * this.itemsPerPage;
-            const end = start + this.itemsPerPage;
-            return this.filteredFiles.slice(start, end);
+            return this.filteredFiles;
         },
         currentPath: '/', 
         openMenuId: null,
@@ -6616,12 +6614,10 @@ function shareApp() {
             }
         },
         get totalPages() {
-            return Math.ceil(this.filteredFiles.length / this.itemsPerPage) || 1;
+            return 1;
         },
         get displayedFiles() {
-            const start = (this.currentPage - 1) * this.itemsPerPage;
-            const end = start + this.itemsPerPage;
-            return this.filteredFiles.slice(start, end);
+            return this.filteredFiles;
         },
         get isOnlyFoldersSelected() {
             if (this.selectedIds.length === 0) return false;
