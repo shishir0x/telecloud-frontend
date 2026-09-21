@@ -299,12 +299,15 @@
                                     <i class="fa-solid fa-folder text-amber-400 text-2xl drop-shadow-sm"></i>
                                 </template>
                                 <template x-if="!file.is_folder">
-                                    <div class="w-full h-full relative flex items-center justify-center">
-                                        <template x-if="file.has_thumb">
-                                            <img :src="`/api/files/${file.id}/thumb`" loading="lazy" alt="thumb" class="w-full h-full object-cover rounded-xl shadow-sm" @error="file.has_thumb = false">
-                                        </template>
-                                        <template x-if="!file.has_thumb">
-                                            <div x-html="getFileTypeData(file.filename).i" class="scale-75 opacity-80" :class="getFileTypeData(file.filename).c.split(' ')[1]"></div>
+                                    <div class="w-full h-full relative flex items-center justify-center overflow-hidden rounded-xl"
+                                        x-data="{ thumbLoaded: false, thumbFailed: false }">
+                                        <div x-html="getFileTypeData(file.filename).i" class="scale-75 opacity-80 text-slate-400 dark:text-slate-300" :class="getFileTypeData(file.filename).c.split(' ')[1]"></div>
+                                        <template x-if="file.has_thumb && !thumbFailed">
+                                            <img :src="`/api/files/${file.id}/thumb`" alt="thumb"
+                                                class="absolute inset-0 w-full h-full object-cover rounded-xl shadow-sm transition-opacity duration-300"
+                                                :class="thumbLoaded ? 'opacity-100' : 'opacity-0'"
+                                                @load="thumbLoaded = true"
+                                                @error="thumbFailed = true; file.has_thumb = false">
                                         </template>
                                     </div>
                                 </template>
@@ -2933,15 +2936,15 @@
                                             <td class="px-6 py-4">
                                                 <div class="flex items-center gap-3">
                                                     <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden bg-white dark:bg-slate-800"
-                                                        :class="file.has_thumb ? '' : getFileTypeData(file).c">
-                                                        <template x-if="file.has_thumb">
-                                                            <img :src="`/api/files/${file.id}/thumb`" loading="lazy"
+                                                        x-data="{ thumbLoaded: false, thumbFailed: false }">
+                                                        <div x-html="getFileTypeData(file).i" class="scale-75 opacity-80 text-slate-400 dark:text-slate-300" :class="getFileTypeData(file).c.split(' ')[1]"></div>
+                                                        <template x-if="file.has_thumb && !thumbFailed">
+                                                            <img :src="`/api/files/${file.id}/thumb`"
                                                                 alt="thumb"
-                                                                class="w-full h-full object-cover rounded-xl shadow-sm"
-                                                                @error="file.has_thumb = false">
-                                                        </template>
-                                                        <template x-if="!file.has_thumb">
-                                                            <div x-html="getFileTypeData(file).i"></div>
+                                                                class="absolute inset-0 w-full h-full object-cover rounded-xl shadow-sm transition-opacity duration-300"
+                                                                :class="thumbLoaded ? 'opacity-100' : 'opacity-0'"
+                                                                @load="thumbLoaded = true"
+                                                                @error="thumbFailed = true; file.has_thumb = false">
                                                         </template>
                                                     </div>
                                                     <div class="flex flex-col min-w-0">
@@ -3089,19 +3092,19 @@
                                                                 class="fa-solid fa-folder text-amber-400 text-xl md:text-2xl drop-shadow-sm"></i>
                                                         </template>
                                                         <template x-if="!file.is_folder">
-                                                            <div
-                                                                class="w-full h-full relative flex items-center justify-center">
-                                                                <template x-if="file.has_thumb">
+                                                            <div class="w-full h-full relative flex items-center justify-center overflow-hidden rounded-xl"
+                                                                x-data="{ thumbLoaded: false, thumbFailed: false }">
+                                                                <div x-html="getFileTypeData(file.filename).i"
+                                                                    class="scale-75 opacity-80 text-slate-400 dark:text-slate-300"
+                                                                    :class="getFileTypeData(file.filename).c.split(' ')[1]">
+                                                                </div>
+                                                                <template x-if="file.has_thumb && !thumbFailed">
                                                                     <img :src="`/api/files/${file.id}/thumb`"
-                                                                        loading="lazy" alt="thumb"
-                                                                        class="w-full h-full object-cover rounded-xl shadow-sm"
-                                                                        @error="file.has_thumb = false">
-                                                                </template>
-                                                                <template x-if="!file.has_thumb">
-                                                                    <div x-html="getFileTypeData(file.filename).i"
-                                                                        class="scale-75 opacity-80"
-                                                                        :class="getFileTypeData(file.filename).c.split(' ')[1]">
-                                                                    </div>
+                                                                        alt="thumb"
+                                                                        class="absolute inset-0 w-full h-full object-cover rounded-xl shadow-sm transition-opacity duration-300"
+                                                                        :class="thumbLoaded ? 'opacity-100' : 'opacity-0'"
+                                                                        @load="thumbLoaded = true"
+                                                                        @error="thumbFailed = true; file.has_thumb = false">
                                                                 </template>
                                                             </div>
                                                         </template>
@@ -3372,19 +3375,19 @@
                                                             class="fa-solid fa-folder text-amber-400 text-4xl md:text-5xl drop-shadow-sm"></i>
                                                     </template>
                                                     <template x-if="!file.is_folder">
-                                                        <div
-                                                            class="w-full h-full relative flex items-center justify-center">
-                                                            <template x-if="file.has_thumb">
-                                                                <img :src="`/api/files/${file.id}/thumb`" loading="lazy"
+                                                        <div class="w-full h-full relative flex items-center justify-center overflow-hidden rounded-2xl"
+                                                            x-data="{ thumbLoaded: false, thumbFailed: false }">
+                                                            <div x-html="getFileTypeData(file.filename).i"
+                                                                class="scale-[1.5] md:scale-[2] opacity-80 text-slate-400 dark:text-slate-300"
+                                                                :class="getFileTypeData(file.filename).c.split(' ')[1]">
+                                                            </div>
+                                                            <template x-if="file.has_thumb && !thumbFailed">
+                                                                <img :src="`/api/files/${file.id}/thumb`"
                                                                     alt="thumb"
-                                                                    class="w-full h-full object-cover rounded-2xl shadow-sm"
-                                                                    @error="file.has_thumb = false">
-                                                            </template>
-                                                            <template x-if="!file.has_thumb">
-                                                                <div x-html="getFileTypeData(file.filename).i"
-                                                                    class="scale-[1.5] md:scale-[2] opacity-80"
-                                                                    :class="getFileTypeData(file.filename).c.split(' ')[1]">
-                                                                </div>
+                                                                    class="absolute inset-0 w-full h-full object-cover rounded-2xl shadow-sm transition-opacity duration-300"
+                                                                    :class="thumbLoaded ? 'opacity-100' : 'opacity-0'"
+                                                                    @load="thumbLoaded = true"
+                                                                    @error="thumbFailed = true; file.has_thumb = false">
                                                             </template>
                                                         </div>
                                                     </template>
