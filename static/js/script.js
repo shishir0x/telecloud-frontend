@@ -1730,7 +1730,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         },
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
-        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false, bubbleMode: false, isDragging: false },
         modal: { show: false, type: 'alert', title: '', message: '', input: '', resolve: null, isDanger: false, inputType: 'text', applyToAll: false },
@@ -5260,7 +5260,6 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             this.pdfViewer.autoScrollSpeed = 2;
             
             const isDarkGlobal = document.documentElement.classList.contains('dark');
-            this.pdfViewer.darkModeFilter = false; // Always render natural crisp white pages by default; toggle available for night reading
 
             const token = this.shareToken || this.token || shareToken || '';
             const hasShareToken = !!token;
@@ -6028,12 +6027,6 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             document.body.appendChild(iframe);
             setTimeout(() => { try { document.body.removeChild(iframe); } catch(e){} }, 60000);
         },
-        togglePdfInvert() {
-            this.pdfViewer.darkModeFilter = !this.pdfViewer.darkModeFilter;
-            if (this.pdfViewer.scrollMode === 'page') {
-                this.renderPdfPage(this.pdfViewer.currentPage);
-            }
-        },
         async showFileInfo(file) {
             if (file.is_folder) return;
             const typeData = this.getFileTypeData(file.filename);
@@ -6661,7 +6654,7 @@ function shareApp() {
         },
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
-        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         fileInfoModal: { show: false, file: null, typeName: '', ext: '', svgIcon: '', bgColor: '', isMedia: false, mediaHtml: '', isLarge: false, isPreviewLoading: false, needsLoad: false, tooLarge: false, bypassWarning: false, unsupportedMedia: false },
         mediaPlayerModal: { show: false, file: null, isAudio: false, isPlaying: false, minimized: false, x: null, y: null, playlist: [], playlistIndex: -1, playlistOpen: false, bubbleMode: false, isDragging: false },
         contextMenu: { show: false, x: 0, y: 0, file: null },
@@ -8331,7 +8324,6 @@ function shareApp() {
             this.pdfViewer.autoScrollSpeed = 2;
             
             const isDarkGlobal = document.documentElement.classList.contains('dark');
-            this.pdfViewer.darkModeFilter = false;
 
             const token = this.shareToken || this.token || shareToken || '';
             const hasShareToken = !!token;
@@ -9096,12 +9088,6 @@ function shareApp() {
             document.body.appendChild(iframe);
             setTimeout(() => { try { document.body.removeChild(iframe); } catch(e){} }, 60000);
         },
-        togglePdfInvert() {
-            this.pdfViewer.darkModeFilter = !this.pdfViewer.darkModeFilter;
-            if (this.pdfViewer.scrollMode === 'page') {
-                this.renderPdfPage(this.pdfViewer.currentPage);
-            }
-        },
         async showFileInfo(file) {
             if (file.is_folder) return;
             const typeData = this.getFileTypeData(file.filename);
@@ -9206,7 +9192,7 @@ function shareFileApp() {
         lightboxLoading: false,
         comicViewer: { show: false, file: null, pages: [], pageUrls: [], currentPageIndex: 0, loading: false, fitMode: 'height', pageLoading: false, scrollMode: 'page', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, direction: 'ltr', viewMode: 'single', filter: 'none', zoomActive: false, touchStartX: 0, touchStartY: 0 },
         epubViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], fontSize: 100, pageProgress: 0, scrollMode: 'scrolled', autoScrollActive: false, autoScrollSpeed: 2, settingsOpen: false, spine: [], resourceBaseUrl: '', currentChapter: 0, title: '', theme: 'system', fontFamily: 'sans-serif' },
-        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, darkModeFilter: false, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
+        pdfViewer: { show: false, file: null, loading: false, sidebarOpen: false, toc: [], zoom: 100, pageProgress: 0, loadProgress: 0, settingsOpen: false, currentPage: 1, numPages: 0, pageLoading: false, autoScrollActive: false, autoScrollSpeed: 2, scrollMode: 'page' },
         toastModal: { show: false, message: '', type: 'success', persistent: false },
         toastTimeout: null,
         
@@ -10172,7 +10158,6 @@ function shareFileApp() {
             this.pdfViewer.autoScrollSpeed = 2;
             
             const isDarkGlobal = document.documentElement.classList.contains('dark');
-            this.pdfViewer.darkModeFilter = false;
 
             const token = this.shareToken || this.token || shareToken || '';
             const hasShareToken = !!token;
@@ -10929,12 +10914,6 @@ function shareFileApp() {
             };
             document.body.appendChild(iframe);
             setTimeout(() => { try { document.body.removeChild(iframe); } catch(e){} }, 60000);
-        },
-        togglePdfInvert() {
-            this.pdfViewer.darkModeFilter = !this.pdfViewer.darkModeFilter;
-            if (this.pdfViewer.scrollMode === 'page') {
-                this.renderPdfPage(this.pdfViewer.currentPage);
-            }
         },
 
         init() {
