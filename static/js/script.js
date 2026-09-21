@@ -3737,11 +3737,11 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
         supportsThumbnail(file) {
             if (!file || file.is_folder) return false;
             const mime = file.mime_type || '';
-            if (mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/')) {
+            if (mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/') || mime === 'application/pdf') {
                 return true;
             }
             const ext = (file.filename || '').split('.').pop().toLowerCase();
-            return ['epub', 'cbz'].includes(ext);
+            return ['epub', 'cbz', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'svg', 'heic', 'avif', 'mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'mp3', 'flac', 'wav', 'ogg', 'm4a', 'aac', 'opus'].includes(ext);
         },
         async renameFile(file) { 
             const newName = await this.customPrompt(this.t('rename_title'), file.filename); 
