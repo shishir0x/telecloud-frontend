@@ -15,28 +15,56 @@ const TeleCloud = window.TeleCloud = {
         { code: 'zh', name: '简体中文', flag: '🇨🇳' },
         { code: 'ja', name: '日本語', flag: '🇯🇵' }
     ],
-    // Always start in English. Only an explicit choice written by setLang() is
-    // honoured. (Browser-language detection used to switch the whole UI based on
-    // navigator.language, which surprised users whose device is not in English.)
-    lang: localStorage.getItem('lang') || 'en',
+    // Storage key for an explicitly chosen language. The key was renamed so
+    // values written by older builds (which auto-detected the browser/device
+    // language) are ignored on upgrade and the app starts in English again.
+    langStorageKey: 'tc_lang',
+    legacyLangStorageKey: 'lang',
+
+    // Active UI language. Always English unless the user explicitly picked
+    // another language from the in-app selector.
+    lang: 'en',
     translations: {},
     translationsLoaded: false,
 
-    async loadTranslations(lang) {
+    /**
+     * Resolves the UI language. English is the default: only a code that is
+     * present in availableLangs AND was explicitly saved by setLang() is used.
+     * Anything else (no value, unsupported code, blocked storage) → English.
+     */
+    resolveLang() {
+        try {
+            const saved = (localStorage.getItem(this.langStorageKey) || '').trim().toLowerCase();
+            if (saved && this.availableLangs.some(l => l.code === saved)) return saved;
+        } catch (e) {
+            // localStorage unavailable (private mode / blocked) - default to English
+        }
+        return 'en';
+    },
+
+    // silent = true loads the dictionary without notifying the UI. Used for the
+    // English fallback dictionary, which must not change the active language.
+    async loadTranslations(lang, silent = false) {
         if (this.translations[lang]) return;
         try {
             const response = await fetch(`/static/locales/${lang}.min.json?v=${this.version}`);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             this.translations[lang] = await response.json();
             this.translationsLoaded = true;
-            window.dispatchEvent(new CustomEvent('tc-translations-loaded', { detail: { lang } }));
+            if (!silent) window.dispatchEvent(new CustomEvent('tc-translations-loaded', { detail: { lang } }));
         } catch (e) {
             console.error('Failed to load translations for', lang, e);
         }
     },
 
     t(key, params = {}, lang = this.lang) {
-        let text = (this.translations[lang] && this.translations[lang][key]) || key;
+        // Look up the active language first, then fall back to the English
+        // dictionary, and only then to the raw key. This keeps the UI readable
+        // in English when a key is missing from a non-English locale file or
+        // that locale failed to load.
+        const dict = this.translations[lang];
+        const fallback = this.translations.en;
+        let text = (dict && dict[key]) || (fallback && fallback[key]) || key;
         Object.keys(params).forEach(p => {
             text = text.split(`{${p}}`).join(params[p]);
         });
@@ -50,9 +78,15 @@ const TeleCloud = window.TeleCloud = {
     },
 
     async setLang(l) {
+        if (!this.availableLangs.some(entry => entry.code === l)) l = 'en';
         this.lang = l;
-        localStorage.setItem('lang', l);
+        try {
+            localStorage.setItem(this.langStorageKey, l);
+            // Drop the value written by older builds so it cannot re-apply.
+            localStorage.removeItem(this.legacyLangStorageKey);
+        } catch (e) { /* storage unavailable - the choice just won't persist */ }
         document.documentElement.lang = l;
+        await this.loadTranslations('en', true);
         await this.loadTranslations(l);
         return l;
     },
@@ -324,9 +358,12 @@ const TeleCloud = window.TeleCloud = {
     }
 };
 
-// Initialize load
+// Initialize load - English unless the user explicitly chose another language.
+TeleCloud.lang = TeleCloud.resolveLang();
 document.documentElement.lang = TeleCloud.lang;
-TeleCloud.loadTranslations(TeleCloud.lang);
+// English is always loaded first (silently) so it can serve as the fallback
+// dictionary, then the active language is loaded and the UI is notified.
+TeleCloud.loadTranslations('en', true).then(() => TeleCloud.loadTranslations(TeleCloud.lang));
 
 // Console welcome message
 (function() {
