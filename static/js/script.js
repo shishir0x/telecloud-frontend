@@ -3107,7 +3107,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
 
                         // For external URLs, bypass client-side fetch to prevent violating Content Security Policy (connect-src) 
                         // and CORS restrictions. Directly request server-side remote download.
-                        this.showToast(this.t('remote_adding') || 'Đang yêu cầu máy chủ tải ảnh...', 'info');
+                        this.showToast(this.t('remote_adding') || 'Requesting the server to fetch the file...', 'info');
                         try {
                             const taskId = 'remote_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
                             const displayName = imageUrl.split('/').pop().split('?')[0] || 'dropped_image.jpg';
@@ -3116,7 +3116,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                                 id: taskId,
                                 name: 'URL: ' + displayName,
                                 progress: 0,
-                                statusText: this.t('preparing_upload') || 'Đang chuẩn bị...',
+                                statusText: this.t('preparing_upload') || 'Preparing...',
                                 isCancelled: false,
                                 hasError: false,
                                 status: 'preparing',
@@ -3146,7 +3146,7 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                             }
                         } catch (remoteErr) {
                             console.error("Server-side Remote Upload failed:", remoteErr);
-                            this.showToast(this.t('remote_failed') || 'Tải ảnh qua máy chủ thất bại', 'error');
+                            this.showToast(this.t('remote_failed') || 'Server-side remote fetch failed', 'error');
                         }
                     }
                 }

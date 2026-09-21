@@ -237,7 +237,7 @@
                         <div class="w-full p-6 flex flex-col items-center justify-center bg-rose-50 dark:bg-rose-500/10 rounded-2xl border border-dashed border-rose-200 dark:border-rose-500/30 animate-fade-in text-center">
                             <i class="fa-solid fa-circle-xmark text-4xl text-rose-500 mb-3 animate-pulse"></i>
                             <p class="text-sm text-rose-800 dark:text-rose-400 font-bold mb-2" x-text="t('preview_blocked')"></p>
-                            <p class="text-xs text-rose-600 dark:text-rose-500/80" x-text="t('preview_blocked_desc') || 'Vui lòng tải xuống tệp tin để xem toàn bộ nội dung.'"></p>
+                            <p class="text-xs text-rose-600 dark:text-rose-500/80" x-text="t('preview_blocked_desc') || 'This file exceeds the online preview size limit. Please download to view.'"></p>
                         </div>
                     </div>
             
@@ -962,7 +962,7 @@
                 x-transition:leave-end="-translate-x-full">
                 
                 <div class="p-4 border-b flex justify-between items-center bg-black/5 dark:bg-white/5" :style="'border-color: var(--epub-border);'">
-                    <span class="font-bold text-sm uppercase tracking-wider text-ellipsis overflow-hidden" :style="'color: var(--epub-fg);'" x-text="t('epub_toc') || 'Mục lục'">Mục lục</span>
+                    <span class="font-bold text-sm uppercase tracking-wider text-ellipsis overflow-hidden" :style="'color: var(--epub-fg);'" x-text="t('epub_toc') || 'Table of Contents'">Table of Contents</span>
                     <button @click="epubViewer.sidebarOpen = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                         <i class="fa-solid fa-xmark text-lg"></i>
                     </button>
@@ -1212,7 +1212,7 @@
                 x-transition:leave-end="-translate-x-full">
                 
                 <div class="p-4 border-b border-slate-200 dark:border-slate-700/50 flex justify-between items-center bg-slate-100/50 dark:bg-slate-800/50">
-                    <span class="font-bold text-slate-900 dark:text-white text-sm uppercase tracking-wider text-ellipsis overflow-hidden" x-text="t('outline') || 'Mục lục'"></span>
+                    <span class="font-bold text-slate-900 dark:text-white text-sm uppercase tracking-wider text-ellipsis overflow-hidden" x-text="t('outline') || 'Outline'"></span>
                     <button @click="pdfViewer.sidebarOpen = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                         <i class="fa-solid fa-xmark text-lg"></i>
                     </button>
@@ -1221,7 +1221,7 @@
                 <!-- Outline tree list -->
                 <div class="flex-1 overflow-y-auto p-2 space-y-1">
                     <template x-if="pdfViewer.toc.length === 0">
-                        <div class="p-4 text-center text-xs text-slate-400" x-text="t('no_outline') || 'Không có mục lục'"></div>
+                        <div class="p-4 text-center text-xs text-slate-400" x-text="t('no_outline') || 'No table of contents'"></div>
                     </template>
                     <template x-for="(item, index) in pdfViewer.toc" :key="index">
                         <button @click="pdfJumpToPage(item.page)"
@@ -1260,7 +1260,7 @@
                     <div x-show="pdfViewer.pageLoading && pdfViewer.scrollMode === 'page'" x-cloak
                         class="absolute top-4 right-4 z-20 bg-slate-800/80 backdrop-blur text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-2 shadow font-bold">
                         <div class="w-3.5 h-3.5 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
-                        <span x-text="t('rendering') || 'Đang vẽ trang...'"></span>
+                        <span x-text="t('rendering') || 'Rendering page...'"></span>
                     </div>
 
                     <!-- Single Page Mode Canvas -->

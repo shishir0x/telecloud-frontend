@@ -4,9 +4,10 @@
 
 const TeleCloud = window.TeleCloud = {
     version: window.TELECLOUD_VERSION || 'dev',
+    // English is the default and the first entry (language cycle starts here).
     availableLangs: [
-        { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
         { code: 'en', name: 'English', flag: '🇬🇧' },
+        { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
         { code: 'km', name: 'Khmer', flag: '🇰🇭' },
         { code: 'ar', name: 'العربية', flag: '🇸🇦' },
         { code: 'hi', name: 'हिन्दी', flag: '🇮🇳' },
@@ -14,11 +15,10 @@ const TeleCloud = window.TeleCloud = {
         { code: 'zh', name: '简体中文', flag: '🇨🇳' },
         { code: 'ja', name: '日本語', flag: '🇯🇵' }
     ],
-    lang: localStorage.getItem('lang') || (function () {
-        const browserLang = navigator.language.split('-')[0];
-        const supported = ['vi', 'en', 'km', 'ar', 'hi', 'ru', 'zh', 'ja'];
-        return supported.includes(browserLang) ? browserLang : 'en';
-    })(),
+    // Always start in English. Only an explicit choice written by setLang() is
+    // honoured. (Browser-language detection used to switch the whole UI based on
+    // navigator.language, which surprised users whose device is not in English.)
+    lang: localStorage.getItem('lang') || 'en',
     translations: {},
     translationsLoaded: false,
 
@@ -52,6 +52,7 @@ const TeleCloud = window.TeleCloud = {
     async setLang(l) {
         this.lang = l;
         localStorage.setItem('lang', l);
+        document.documentElement.lang = l;
         await this.loadTranslations(l);
         return l;
     },
@@ -324,6 +325,7 @@ const TeleCloud = window.TeleCloud = {
 };
 
 // Initialize load
+document.documentElement.lang = TeleCloud.lang;
 TeleCloud.loadTranslations(TeleCloud.lang);
 
 // Console welcome message

@@ -253,7 +253,7 @@
                         <div class="px-8 pt-2">
                             <button type="button" @click="cancelAuthFlow()" :disabled="loading"
                                 class="w-full py-3.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold transition-all shadow-md active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-                                x-text="t('setup_back_phone') || 'Quay lại'"></button>
+                                x-text="t('setup_back_phone') || 'Back to Phone'"></button>
                         </div>
                     </div>
 
@@ -263,7 +263,7 @@
                             class="flex items-center justify-between w-full py-2.5 px-3 rounded-xl hover:bg-slate-100/50 dark:hover:bg-slate-900/30 text-xs font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-all select-none border border-transparent hover:border-slate-200/40 dark:hover:border-slate-800/40">
                             <span class="flex items-center gap-2">
                                 <i class="fa-solid fa-gears text-sm transition-transform duration-500" :class="showAdvanced ? 'rotate-90 text-blue-500' : ''"></i>
-                                <span x-text="t('setup_advanced_settings')">Cài đặt nâng cao</span>
+                                <span x-text="t('setup_advanced_settings')">Advanced settings</span>
                             </span>
                             <span class="flex items-center gap-2">
                                 <!-- Status Badge in Header -->
@@ -287,7 +287,7 @@
                                             <span class="relative inline-flex rounded-full h-2 w-2"
                                                 :class="!api_id ? 'bg-emerald-500' : 'bg-purple-500'"></span>
                                         </span>
-                                        <span x-text="!api_id ? (t('setup_api_status_default') || 'Đang dùng API mặc định hệ thống') : (t('setup_api_status_custom') || 'Đang dùng API cá nhân tự cấu hình')"></span>
+                                        <span x-text="!api_id ? (t('setup_api_status_default') || 'Using system default API credentials') : (t('setup_api_status_custom') || 'Using custom personal API credentials')"></span>
                                     </div>
                                     <i :class="!api_id ? 'fa-solid fa-cloud-bolt text-xs opacity-70' : 'fa-solid fa-user-shield text-xs opacity-70'"></i>
                                 </div>
@@ -296,7 +296,7 @@
                                 <div class="p-3.5 rounded-xl bg-blue-500/5 dark:bg-blue-500/5 border border-blue-500/10 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed space-y-1.5">
                                     <div class="font-bold flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                                         <i class="fa-solid fa-circle-info text-sm"></i>
-                                        <span x-text="t('setup_advanced_api_title')">Cấu hình API Telegram</span>
+                                        <span x-text="t('setup_advanced_api_title')">Custom Telegram API Configuration (Optional)</span>
                                     </div>
                                     <p x-html="t('setup_advanced_api_desc')"></p>
                                 </div>
@@ -338,14 +338,14 @@
                                         class="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md hover:shadow-blue-500/10 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
                                         <i class="fa-solid fa-circle-check" x-show="!loading"></i>
                                         <i class="fa-solid fa-spinner fa-spin" x-show="loading"></i>
-                                        <span x-text="t('setup_save_api')">Lưu & Áp dụng</span>
+                                        <span x-text="t('setup_save_api')">Save & Apply</span>
                                     </button>
                                     
                                     <button type="button" @click="restoreDefaultApi" :disabled="loading || !has_default_api || !api_id"
                                         class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/60 dark:hover:bg-slate-800/80 border border-slate-200/40 dark:border-slate-800/40 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                                         :title="t('setup_restore_default_api')">
                                         <i class="fa-solid fa-rotate-left"></i>
-                                        <span x-text="t('setup_restore_default_api') || 'Mặc định'">Mặc định</span>
+                                        <span x-text="t('setup_restore_default_api') || 'Restore default'">Restore default</span>
                                     </button>
                                 </div>
 
@@ -370,10 +370,10 @@
                                 <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                                     <button type="button" @click="log_group_id = 'me'"
                                         class="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 shadow-md shadow-blue-500/20 select-none cursor-pointer"
-                                        x-text="t('setup_use_me_btn')">Dùng 'me'</button>
+                                        x-text="t('setup_use_me_btn')">Use 'me'</button>
                                     <button type="button" @click="log_group_id = ''" x-show="log_group_id"
                                         class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-                                        :title="t('clear') || 'Xóa'">
+                                        :title="t('clear') || 'Clear'">
                                         <i class="fa-solid fa-xmark text-sm"></i>
                                     </button>
                                 </div>
@@ -384,15 +384,15 @@
                                 <div class="text-[11px] leading-relaxed space-y-2">
                                     <div class="font-bold flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                                         <i class="fa-solid fa-circle-question text-sm"></i>
-                                        <span x-text="t('setup_log_group_explain_title')">Tại sao nên/không nên dùng 'me'?</span>
+                                        <span x-text="t('setup_log_group_explain_title')">Why or why not use 'me'?</span>
                                     </div>
                                     <div class="grid grid-cols-1 gap-2 mt-1">
                                         <div class="p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                                            <span class="font-semibold text-amber-600 dark:text-amber-400 block mb-0.5" x-text="t('setup_log_group_explain_me_title')">⚠️ Dùng "me" (Saved Messages):</span>
+                                            <span class="font-semibold text-amber-600 dark:text-amber-400 block mb-0.5" x-text="t('setup_log_group_explain_me_title')">⚠️ Use 'me' (Saved Messages):</span>
                                             <p class="text-slate-600 dark:text-slate-400" x-text="t('setup_log_group_explain_me')"></p>
                                         </div>
                                         <div class="p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                                            <span class="font-semibold text-emerald-600 dark:text-emerald-400 block mb-0.5" x-text="t('setup_log_group_explain_group_title')">✅ Dùng Nhóm (Log Group ID):</span>
+                                            <span class="font-semibold text-emerald-600 dark:text-emerald-400 block mb-0.5" x-text="t('setup_log_group_explain_group_title')">✅ Use Dedicated Group (Log Group ID):</span>
                                             <p class="text-slate-600 dark:text-slate-400" x-text="t('setup_log_group_explain_group')"></p>
                                         </div>
                                     </div>
@@ -402,7 +402,7 @@
                                 <div class="pt-2 border-t border-slate-200/50 dark:border-slate-800/50 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                                     <div class="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-1.5">
                                         <i class="fa-solid fa-circle-info text-sm text-blue-500"></i>
-                                        <span x-text="t('setup_log_group_guide_title')">Cách lấy LOG_GROUP_ID:</span>
+                                        <span x-text="t('setup_log_group_guide_title')">How to get LOG_GROUP_ID:</span>
                                     </div>
                                     <p x-html="t('setup_log_group_guide_desc')"></p>
                                 </div>
