@@ -443,6 +443,24 @@ window.registerComicLazyImage = function(el) {
 };
 
 window.registerPdfLazyPage = function(el, pageNum) {
+    // Reserve each page's real footprint before it renders so vertical scrolling
+    // and the scrollbar stay accurate instead of showing tall empty blocks.
+    if (el && !el.getAttribute('data-sized')) {
+        try {
+            if (window._pdfPlaceholderWidth == null) {
+                const container = document.getElementById('pdf-continuous-container') ||
+                                  document.getElementById('share-pdf-continuous-container') ||
+                                  document.getElementById('share-folder-pdf-continuous-container');
+                // The scroller keeps a px-4 gutter (32px total) on every breakpoint, so the
+                // fit-width scale matches this exactly. Read once per document (no per-page reflow).
+                window._pdfPlaceholderWidth = Math.max(200, (container ? container.clientWidth : window.innerWidth) - 32);
+            }
+            const ratio = window._pdfPageRatio || 1.294;
+            el.style.width = Math.floor(window._pdfPlaceholderWidth) + 'px';
+            el.style.height = Math.floor(window._pdfPlaceholderWidth * ratio) + 'px';
+            el.setAttribute('data-sized', '1');
+        } catch (e) {}
+    }
     if (!window._pdfIntersectionObserver) {
         window._pdfIntersectionObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
@@ -5323,6 +5341,16 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                     
                     window._pdfDoc = pdfDoc;
                     this.pdfViewer.numPages = pdfDoc.numPages;
+                    // Cache page 1 geometry so unrendered page placeholders match the
+                    // real page size (accurate scroll length, no tall empty gaps).
+                    try {
+                        const firstViewport = (await pdfDoc.getPage(1)).getViewport({ scale: 1 });
+                        window._pdfPageRatio = firstViewport.height / firstViewport.width;
+                    } catch (e) {
+                        window._pdfPageRatio = 1.294;
+                    }
+                    // Force the placeholder width to be recomputed for this document/viewport
+                    window._pdfPlaceholderWidth = null;
                     this.pdfViewer.loading = false;
 
                     try {
@@ -5381,12 +5409,9 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                                 startPage = p;
                             }
                         }
-                        const savedMode = localStorage.getItem(`pdf-scroll-mode-${file.id}`);
-                        if (savedMode) {
-                            this.pdfViewer.scrollMode = savedMode;
-                        } else {
-                            this.pdfViewer.scrollMode = 'continuous';
-                        }
+                        // Always open in vertical (continuous) scroll mode; the reader
+                        // toolbar can still switch to single-page mode for this session.
+                        this.pdfViewer.scrollMode = 'continuous';
                     } else {
                         this.pdfViewer.scrollMode = 'continuous';
                     }
@@ -5906,6 +5931,13 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 canvas.height = Math.floor(viewport.height * outputScale);
                 canvas.style.width = Math.floor(viewport.width) + "px";
                 canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                // Keep the page placeholder in sync with the rendered canvas (e.g. after zoom)
+                const wrapper = canvas.parentElement;
+                if (wrapper) {
+                    wrapper.style.width = Math.floor(viewport.width) + "px";
+                    wrapper.style.height = Math.floor(viewport.height) + "px";
+                }
                 
                 const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
                 const renderContext = {
@@ -8380,6 +8412,16 @@ function shareApp() {
                     
                     window._pdfDoc = pdfDoc;
                     this.pdfViewer.numPages = pdfDoc.numPages;
+                    // Cache page 1 geometry so unrendered page placeholders match the
+                    // real page size (accurate scroll length, no tall empty gaps).
+                    try {
+                        const firstViewport = (await pdfDoc.getPage(1)).getViewport({ scale: 1 });
+                        window._pdfPageRatio = firstViewport.height / firstViewport.width;
+                    } catch (e) {
+                        window._pdfPageRatio = 1.294;
+                    }
+                    // Force the placeholder width to be recomputed for this document/viewport
+                    window._pdfPlaceholderWidth = null;
                     this.pdfViewer.loading = false;
 
                     try {
@@ -8438,12 +8480,9 @@ function shareApp() {
                                 startPage = p;
                             }
                         }
-                        const savedMode = localStorage.getItem(`pdf-scroll-mode-${file.id}`);
-                        if (savedMode) {
-                            this.pdfViewer.scrollMode = savedMode;
-                        } else {
-                            this.pdfViewer.scrollMode = 'continuous';
-                        }
+                        // Always open in vertical (continuous) scroll mode; the reader
+                        // toolbar can still switch to single-page mode for this session.
+                        this.pdfViewer.scrollMode = 'continuous';
                     } else {
                         this.pdfViewer.scrollMode = 'continuous';
                     }
@@ -8960,6 +8999,13 @@ function shareApp() {
                 canvas.height = Math.floor(viewport.height * outputScale);
                 canvas.style.width = Math.floor(viewport.width) + "px";
                 canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                // Keep the page placeholder in sync with the rendered canvas (e.g. after zoom)
+                const wrapper = canvas.parentElement;
+                if (wrapper) {
+                    wrapper.style.width = Math.floor(viewport.width) + "px";
+                    wrapper.style.height = Math.floor(viewport.height) + "px";
+                }
                 
                 const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
                 const renderContext = {
@@ -10203,6 +10249,16 @@ function shareFileApp() {
                     
                     window._pdfDoc = pdfDoc;
                     this.pdfViewer.numPages = pdfDoc.numPages;
+                    // Cache page 1 geometry so unrendered page placeholders match the
+                    // real page size (accurate scroll length, no tall empty gaps).
+                    try {
+                        const firstViewport = (await pdfDoc.getPage(1)).getViewport({ scale: 1 });
+                        window._pdfPageRatio = firstViewport.height / firstViewport.width;
+                    } catch (e) {
+                        window._pdfPageRatio = 1.294;
+                    }
+                    // Force the placeholder width to be recomputed for this document/viewport
+                    window._pdfPlaceholderWidth = null;
                     this.pdfViewer.loading = false;
 
                     try {
@@ -10261,12 +10317,9 @@ function shareFileApp() {
                                 startPage = p;
                             }
                         }
-                        const savedMode = localStorage.getItem(`pdf-scroll-mode-${file.id}`);
-                        if (savedMode) {
-                            this.pdfViewer.scrollMode = savedMode;
-                        } else {
-                            this.pdfViewer.scrollMode = 'continuous';
-                        }
+                        // Always open in vertical (continuous) scroll mode; the reader
+                        // toolbar can still switch to single-page mode for this session.
+                        this.pdfViewer.scrollMode = 'continuous';
                     } else {
                         this.pdfViewer.scrollMode = 'continuous';
                     }
@@ -10783,6 +10836,13 @@ function shareFileApp() {
                 canvas.height = Math.floor(viewport.height * outputScale);
                 canvas.style.width = Math.floor(viewport.width) + "px";
                 canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                // Keep the page placeholder in sync with the rendered canvas (e.g. after zoom)
+                const wrapper = canvas.parentElement;
+                if (wrapper) {
+                    wrapper.style.width = Math.floor(viewport.width) + "px";
+                    wrapper.style.height = Math.floor(viewport.height) + "px";
+                }
                 
                 const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
                 const renderContext = {
