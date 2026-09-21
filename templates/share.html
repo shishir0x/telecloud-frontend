@@ -262,20 +262,13 @@
                         </button>
                     </template>
 
-                    <!-- PDF Action Buttons: Built-in Reader & Open in Native Tab -->
+                    <!-- PDF Reader Button -->
                     <template x-if="typeKey === 'type_pdf' && (!tooLarge || bypassWarning)">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full mb-2">
-                            <button @click="openPdfViewer({ id: id, filename: filename })"
-                                class="group relative w-full flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-base shadow-[0_10px_20px_rgba(220,38,38,0.25)] transition-all active:scale-[0.98] overflow-hidden">
-                                <i class="fa-solid fa-file-pdf text-lg"></i>
-                                <span x-text="t('pdf_reader') || 'PDF Reader'"></span>
-                            </button>
-                            <button @click.prevent.stop="openPdfInNewTab({ id: id, filename: filename })"
-                                class="group relative w-full flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-base shadow-[0_10px_20px_rgba(30,41,59,0.2)] transition-all active:scale-[0.98] border border-slate-700/60">
-                                <i class="fa-solid fa-arrow-up-right-from-square text-base text-rose-400"></i>
-                                <span>Open in Tab</span>
-                            </button>
-                        </div>
+                        <button @click="openPdfViewer({ id: id, filename: filename })"
+                            class="group relative w-full flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-base shadow-[0_10px_20px_rgba(220,38,38,0.25)] transition-all active:scale-[0.98] overflow-hidden mb-2">
+                            <i class="fa-solid fa-file-pdf text-lg"></i>
+                            <span x-text="t('pdf_reader') || 'PDF Reader'"></span>
+                        </button>
                     </template>
 
                     <form method="POST" action="/s/{{ .token }}/dl" target="hidden_download_iframe" id="download-form" class="w-full">
@@ -1138,13 +1131,6 @@
                         <i class="fa-solid fa-plus text-xs"></i>
                     </button>
 
-                    <!-- Open in Native Browser Tab -->
-                    <button @click.prevent.stop="openPdfInNewTab(pdfViewer.file)"
-                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
-                        title="Open in Browser Native Viewer">
-                        <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
-                    </button>
-
                     <!-- Download PDF -->
                     <a :href="getPdfDownloadUrl(pdfViewer.file)" download
                         class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
@@ -1203,7 +1189,7 @@
                  </button>
              </div>
 
-             <!-- Actions: Invert, Auto-scroll, Open in Tab, Download -->
+             <!-- Actions: Invert, Auto-scroll, Download -->
              <div class="flex items-center gap-2">
                  <!-- Dark mode invert filter toggle -->
                  <button @click="togglePdfInvert()"
@@ -1219,13 +1205,6 @@
                      :class="pdfViewer.autoScrollActive ? 'text-emerald-600 dark:text-emerald-400 bg-slate-100 dark:bg-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400'"
                      :title="pdfViewer.autoScrollActive ? t('pdf_auto_scroll_stop') : t('pdf_auto_scroll_start')">
                      <i class="fa-solid text-sm" :class="pdfViewer.autoScrollActive ? 'fa-pause' : 'fa-play'"></i>
-                 </button>
-
-                 <!-- Open in Native Tab -->
-                 <button @click.prevent.stop="openPdfInNewTab(pdfViewer.file)"
-                     class="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
-                     title="Open in Browser Native Viewer">
-                     <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
                  </button>
 
                  <!-- Download -->

@@ -63,11 +63,11 @@ async function ensurePdfLoaded() {
     });
 }
 
-// Popup-blocker / WebView-safe "open in new tab".
+// Popup-blocker / WebView-safe "open in a new tab".
 // window.open() is silently dropped by popup blockers and by most in-app
-// WebViews, which is why the PDF "Open in Tab" button appeared to do nothing.
-// Injecting and clicking a real <a target="_blank"> counts as a user-initiated
-// navigation instead of a popup, so it works where window.open() is ignored.
+// WebViews. Injecting and clicking a real <a target="_blank"> counts as a
+// user-initiated navigation instead of a popup, so it is not intercepted.
+// Used by the PDF print fallback when an inline print iframe is unavailable.
 function openUrlInNewTab(url) {
     if (!url) return false;
     const link = document.createElement('a');
@@ -5970,13 +5970,6 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             const filename = file.filename ? encodeURIComponent(file.filename) : 'document.pdf';
             return `/api/files/${file.id}/stream/${filename}`;
         },
-        openPdfInNewTab(file) {
-            if (!file || !file.id) return;
-            const url = this.getPdfStreamUrl(file);
-            if (url) {
-                openUrlInNewTab(url);
-            }
-        },
         getPdfDownloadUrl(file) {
             if (!file || !file.id) return '#';
             return `/download/${file.id}`;
@@ -9031,13 +9024,6 @@ function shareApp() {
             const filename = file.filename ? encodeURIComponent(file.filename) : 'document.pdf';
             return `/s/${this.shareToken}/file/${file.id}/stream/${filename}`;
         },
-        openPdfInNewTab(file) {
-            if (!file || !file.id) return;
-            const url = this.getPdfStreamUrl(file);
-            if (url) {
-                openUrlInNewTab(url);
-            }
-        },
         getPdfDownloadUrl(file) {
             if (!file || !file.id) return '#';
             return `/s/${this.shareToken}/file/${file.id}/dl`;
@@ -10859,12 +10845,6 @@ function shareFileApp() {
         getPdfStreamUrl(file) {
             const filename = (file && file.filename) ? file.filename : (this.filename || 'document.pdf');
             return `/s/${this.token}/stream/${encodeURIComponent(filename)}`;
-        },
-        openPdfInNewTab(file) {
-            const url = this.getPdfStreamUrl(file || { filename: this.filename });
-            if (url) {
-                openUrlInNewTab(url);
-            }
         },
         getPdfDownloadUrl(file) {
             return `/s/${this.token}/dl`;
