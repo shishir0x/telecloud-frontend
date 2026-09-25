@@ -2634,17 +2634,27 @@
                         <div class="space-y-6">
                             <!-- URL Input (Always Visible) -->
                             <div>
-                                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 block"
-                                    x-text="t('url_label_ytdlp')"></label>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block"
+                                        x-text="t('url_label_ytdlp')"></label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer select-none text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                                        <input type="checkbox" x-model="ytdlpAutoDownload"
+                                            @change="localStorage.setItem('telecloud_ytdlp_auto_download', ytdlpAutoDownload)"
+                                            class="w-3.5 h-3.5 rounded border-slate-300 text-red-600 focus:ring-red-500 transition-all">
+                                        <span x-text="t('ytdlp_auto_download')"></span>
+                                    </label>
+                                </div>
                                 <div class="relative group">
                                     <input type="url" x-model="ytdlpUrl"
-                                        @keydown.enter="!ytdlpInfo && fetchYTDLPFormats()"
+                                        @paste="handleYTDLPPaste($event)"
+                                        @input="onYTDLPUrlInput()"
+                                        @keydown.enter.prevent="handleYTDLPEnter()"
                                         class="w-full pl-4 pr-12 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all text-sm"
                                         placeholder="https://www.youtube.com/watch?v=...">
 
                                     <!-- Clear Button (Visible when info exists) -->
                                     <button x-show="ytdlpInfo"
-                                        @click="ytdlpInfo = null; ytdlpUrl = ''; ytdlpSelectedFormat = ''"
+                                        @click="ytdlpInfo = null; ytdlpUrl = ''; ytdlpSelectedFormat = ''; ytdlpDownloading = false"
                                         class="absolute right-2 top-2 bottom-2 px-3 text-slate-400 hover:text-red-500 transition-colors">
                                         <i class="fa-solid fa-circle-xmark text-lg"></i>
                                     </button>
@@ -2777,10 +2787,10 @@
                                             </div>
                                         </div>
 
-                                        <button @click="submitYTDLPDownload"
-                                            class="w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl font-bold shadow-xl shadow-red-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3">
-                                            <i class="fa-solid fa-cloud-arrow-down text-lg"></i>
-                                            <span x-text="t('start_download')"></span>
+                                        <button @click="submitYTDLPDownload" :disabled="ytdlpDownloading"
+                                            class="w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:opacity-75 text-white rounded-2xl font-bold shadow-xl shadow-red-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3">
+                                            <i class="fa-solid" :class="ytdlpDownloading ? 'fa-spinner fa-spin text-lg' : 'fa-cloud-arrow-down text-lg'"></i>
+                                            <span x-text="ytdlpDownloading ? t('ytdlp_started') : t('start_download')"></span>
                                         </button>
                                     </div>
                                 </div>

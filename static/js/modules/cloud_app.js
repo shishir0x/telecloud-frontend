@@ -41,6 +41,8 @@ export function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, web
         ytdlpSelectedFormat: '',
         ytdlpDownloadType: 'video',
         ytdlpHasCookie: false,
+        ytdlpAutoDownload: localStorage.getItem('telecloud_ytdlp_auto_download') !== 'false',
+        ytdlpDownloading: false,
         torrentEnabled: false,
         torrentInput: '',
         torrentLoading: false,
@@ -6045,8 +6047,63 @@ export function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, web
                 this.showToast(this.t('conn_error'), 'error');
             }
         },
+        normalizeYTDLPUrl(rawUrl) {
+            if (!rawUrl) return '';
+            let u = rawUrl.trim();
+            if (!/^https?:\/\//i.test(u) && u.includes('.')) {
+                u = 'https://' + u;
+            }
+            return u;
+        },
+        isValidYTDLPUrl(rawUrl) {
+            try {
+                let parsed = new URL(this.normalizeYTDLPUrl(rawUrl));
+                return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+            } catch (e) {
+                return false;
+            }
+        },
+        handleYTDLPPaste(e) {
+            let pastedText = '';
+            if (e && e.clipboardData) {
+                pastedText = e.clipboardData.getData('text');
+            } else if (window.clipboardData) {
+                pastedText = window.clipboardData.getData('Text');
+            }
+            if (pastedText) {
+                this.ytdlpUrl = this.normalizeYTDLPUrl(pastedText);
+            }
+            this.$nextTick(() => {
+                if (this.ytdlpUrl && !this.ytdlpLoading) {
+                    this.fetchYTDLPFormats();
+                }
+            });
+        },
+        onYTDLPUrlInput() {
+            if (!this.ytdlpUrl) {
+                this.ytdlpInfo = null;
+                this.ytdlpDownloading = false;
+                return;
+            }
+            let u = this.normalizeYTDLPUrl(this.ytdlpUrl);
+            if (this.isValidYTDLPUrl(u) && !this.ytdlpInfo && !this.ytdlpLoading) {
+                clearTimeout(this._ytdlpInputTimer);
+                this._ytdlpInputTimer = setTimeout(() => {
+                    this.ytdlpUrl = u;
+                    this.fetchYTDLPFormats();
+                }, 350);
+            }
+        },
+        handleYTDLPEnter() {
+            if (!this.ytdlpInfo) {
+                this.fetchYTDLPFormats();
+            } else {
+                this.submitYTDLPDownload();
+            }
+        },
         async fetchYTDLPFormats() {
             if (!this.ytdlpUrl) return;
+            this.ytdlpUrl = this.normalizeYTDLPUrl(this.ytdlpUrl);
             
             // Basic URL validation
             try {
@@ -6058,6 +6115,7 @@ export function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, web
 
             this.ytdlpLoading = true;
             this.ytdlpInfo = null;
+            this.ytdlpDownloading = false;
             let fd = new FormData();
             fd.append('url', this.ytdlpUrl);
             try {
@@ -6068,12 +6126,26 @@ export function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, web
                     if (this.ytdlpInfo.formats && this.ytdlpInfo.formats.length > 0) {
                         this.ytdlpSelectedFormat = ''; // Default to best
                     }
+                    // Auto-start download if configured
+                    if (this.ytdlpAutoDownload) {
+                        this.$nextTick(() => {
+                            this.submitYTDLPDownload();
+                        });
+                    }
                 } else {
                     let errorMsg = d.error || 'ytdlp_error';
                     // Simplify complex yt-dlp error messages for the user
-                    if (errorMsg.includes('Unsupported URL')) errorMsg = 'err_unsupported_url';
-                    else if (errorMsg.includes('Unable to download webpage')) errorMsg = 'err_network_error';
-                    else if (errorMsg.includes('Video unavailable')) errorMsg = 'err_video_unavailable';
+                    if (errorMsg.includes('bot_verification_required') || errorMsg.includes('not a bot') || errorMsg.includes('--cookies')) {
+                        errorMsg = 'err_bot_verification_required';
+                    } else if (errorMsg.includes('age_restricted') || errorMsg.includes('confirm your age')) {
+                        errorMsg = 'err_age_restricted';
+                    } else if (errorMsg.includes('Unsupported URL') || errorMsg.includes('unsupported_url')) {
+                        errorMsg = 'err_unsupported_url';
+                    } else if (errorMsg.includes('Unable to download webpage') || errorMsg.includes('network_error')) {
+                        errorMsg = 'err_network_error';
+                    } else if (errorMsg.includes('Video unavailable') || errorMsg.includes('video_unavailable')) {
+                        errorMsg = 'err_video_unavailable';
+                    }
                     
                     this.showToast(this.handleCommonError(errorMsg, 'ytdlp_error'), 'error');
                 }
@@ -6085,12 +6157,14 @@ export function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, web
         },
         async submitYTDLPDownload() {
             if (!this.ytdlpUrl) return;
+            let currentUrl = this.normalizeYTDLPUrl(this.ytdlpUrl);
             let fd = new FormData();
-            fd.append('url', this.ytdlpUrl);
+            fd.append('url', currentUrl);
             fd.append('format_id', this.ytdlpSelectedFormat);
             fd.append('download_type', this.ytdlpDownloadType);
             fd.append('path', this.currentPath);
             try {
+                this.ytdlpDownloading = true;
                 const res = await fetch('/api/ytdlp/download', { method: 'POST', body: fd, headers: { 'X-CSRF-Token': TeleCloud.getCsrfToken() } });
                 if (res.ok) {
                     const data = await res.json();
@@ -6098,15 +6172,15 @@ export function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, web
                         this.uploadQueue.push({
                             id: data.task_id,
                             name: this.ytdlpInfo ? this.ytdlpInfo.title : 'Media Download',
-                        progress: 0,
-                        statusText: this.t('initiating_ytdlp'),
-                        hasError: false,
-                        isCancelled: false,
-                        status: 'preparing',
-                        size: 0,
-                        startTime: Date.now(),
-                        uploadedBytes: 0,
-                        speed: 0
+                            progress: 0,
+                            statusText: this.t('initiating_ytdlp'),
+                            hasError: false,
+                            isCancelled: false,
+                            status: 'preparing',
+                            size: 0,
+                            startTime: Date.now(),
+                            uploadedBytes: 0,
+                            speed: 0
                         });
                     } else {
                         // If task already created via WebSocket, just update its name
@@ -6114,13 +6188,13 @@ export function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, web
                         if (t && this.ytdlpInfo) t.name = this.ytdlpInfo.title;
                     }
                     this.showToast(this.t('ytdlp_started'), 'success');
-                    this.ytdlpUrl = '';
-                    this.ytdlpInfo = null;
                 } else {
+                    this.ytdlpDownloading = false;
                     const d = await res.json();
                     this.showToast(this.handleCommonError(d.error, 'ytdlp_error'), 'error');
                 }
             } catch (e) {
+                this.ytdlpDownloading = false;
                 this.showToast(this.t('conn_error'), 'error');
             }
         }
