@@ -188,6 +188,7 @@
     "err_passkey_auth_failed": "Passkey 身份验证失败",
     "err_passkey_not_configured": "此系统未配置 Passkey。请在管理员账户设置中进行配置。",
     "err_passkey_reg_failed": "Passkey 注册失败",
+    "err_password_too_short": "Password must be at least 8 characters long",
     "err_remote_failed": "连接到 URL 失败或被拒绝。",
     "err_remote_forbidden": "服务器拒绝访问 (403 Forbidden)。",
     "err_remote_not_found": "在该 URL 未找到文件 (404 Not Found)。",

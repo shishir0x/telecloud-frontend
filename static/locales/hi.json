@@ -188,6 +188,7 @@
     "err_passkey_auth_failed": "Passkey प्रमाणीकरण विफल",
     "err_passkey_not_configured": "इस सिस्टम पर Passkey कॉन्फ़िगर नहीं है। कृपया इसे व्यवस्थापक खाता सेटिंग्स में कॉन्फ़िगर करें।",
     "err_passkey_reg_failed": "Passkey पंजीकरण विफल",
+    "err_password_too_short": "Password must be at least 8 characters long",
     "err_remote_failed": "URL से कनेक्शन विफल रहा या इनकार कर दिया गया।",
     "err_remote_forbidden": "सर्वर ने एक्सेस से इनकार कर दिया (403 Forbidden)।",
     "err_remote_not_found": "इस URL पर फ़ाइल नहीं मिली (404 Not Found)।",

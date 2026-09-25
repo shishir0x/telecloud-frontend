@@ -188,6 +188,7 @@
     "err_passkey_auth_failed": "Ошибка аутентификации Passkey",
     "err_passkey_not_configured": "Passkey не настроен в этой системе. Пожалуйста, настройте его в параметрах учетной записи администратора.",
     "err_passkey_reg_failed": "Ошибка регистрации Passkey",
+    "err_password_too_short": "Password must be at least 8 characters long",
     "err_remote_failed": "Ошибка подключения к URL или отказ.",
     "err_remote_forbidden": "Сервер отказал в доступе (403 Forbidden).",
     "err_remote_not_found": "Файл не найден по этому URL (404 Not Found).",

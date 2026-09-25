@@ -188,6 +188,7 @@
     "err_passkey_auth_failed": "Passkey authentication failed",
     "err_passkey_not_configured": "Passkey is not configured on this system. Please configure this in the Admin account settings.",
     "err_passkey_reg_failed": "Passkey registration failed",
+    "err_password_too_short": "Password must be at least 8 characters long",
     "err_remote_failed": "Connection to URL failed or refused.",
     "err_remote_forbidden": "Server denied access (403 Forbidden).",
     "err_remote_not_found": "File not found at this URL (404 Not Found).",

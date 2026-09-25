@@ -117,6 +117,7 @@
                     <div class="flex items-center justify-between p-3.5 bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 rounded-xl relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
                         <input :type="forceChangeModal.showNewPassword ? 'text' : 'password'" 
                                x-model="forceChangeModal.newPassword"
+                               minlength="8"
                                required
                                :placeholder="t('enter_new_password') || 'Enter new password'"
                                class="bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-sm text-slate-900 dark:text-white w-[calc(100%-35px)]">
@@ -132,6 +133,7 @@
                     <div class="flex items-center justify-between p-3.5 bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 rounded-xl relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
                         <input :type="forceChangeModal.showConfirmPassword ? 'text' : 'password'" 
                                x-model="forceChangeModal.confirmPassword"
+                               minlength="8"
                                required
                                :placeholder="t('confirm_password')"
                                class="bg-transparent border-none p-0 focus:ring-0 focus:outline-none text-sm text-slate-900 dark:text-white w-[calc(100%-35px)]">

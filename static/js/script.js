@@ -601,6 +601,10 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
                 this.forceChangeModal.error = this.t('enter_new_password') || 'Enter new password';
                 return;
             }
+            if (Array.from(newPass).length < 8) {
+                this.forceChangeModal.error = this.t('err_password_too_short');
+                return;
+            }
             if (newPass !== confirmPass) {
                 this.forceChangeModal.error = this.t('toast_pass_mismatch') || 'Passwords do not match!';
                 return;
@@ -927,6 +931,10 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             return (translated !== errorKey) ? translated : (this.t(defaultKey) + ' (' + errorStr + ')');
         },
         async resetAdmin() {
+            if (Array.from(this.password || '').length < 8) {
+                this.showToast(this.t('err_password_too_short'), 'error');
+                return;
+            }
             if (this.password !== this.confirmPassword) {
                 this.showToast(this.t('toast_pass_mismatch'), 'error');
                 return;
@@ -952,6 +960,10 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             }
         },
         async setupAdmin() {
+            if (Array.from(this.password || '').length < 8) {
+                this.showToast(this.t('err_password_too_short'), 'error');
+                return;
+            }
             if (this.password !== this.confirmPassword) {
                 this.showToast(this.t('toast_pass_mismatch'), 'error');
                 return;
@@ -971,6 +983,10 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             }
         },
         async changePassword() {
+            if (Array.from(this.settingsForm.newPassword || '').length < 8) {
+                this.showToast(this.t('err_password_too_short'), 'error');
+                return;
+            }
             if (this.settingsForm.newPassword !== this.settingsForm.confirmPassword) {
                 this.showToast(this.t('toast_pass_mismatch'), 'error');
                 return;
@@ -1976,7 +1992,8 @@ function cloudApp(initialIsLoggedIn, isAdmin = true, storageUsed = 0, webdavEnab
             };
 
             try {
-                const res = await fetch('https://api.github.com/repos/dabeecao/telecloud-go/releases');
+                const repo = (window.TeleCloud && window.TeleCloud.githubRepo) ? window.TeleCloud.githubRepo : 'shishir0x/TeleCloud';
+                const res = await fetch(`https://api.github.com/repos/${repo}/releases`);
                 if (res.ok) {
                     const releases = await res.json();
                     if (releases && releases.length > 0) {

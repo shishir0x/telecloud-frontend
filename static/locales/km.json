@@ -188,6 +188,7 @@
     "err_passkey_auth_failed": "ការផ្ទៀងផ្ទាត់ Passkey បរាជ័យ",
     "err_passkey_not_configured": "Passkey មិនត្រូវបានកំណត់រចនាសម្ព័ន្ធនៅលើប្រព័ន្ធនេះទេ។ សូមកំណត់រចនាសម្ព័ន្ធវានៅក្នុងការកំណត់គណនីអ្នកគ្រប់គ្រង។",
     "err_passkey_reg_failed": "ការចុះឈ្មោះ Passkey បរាជ័យ",
+    "err_password_too_short": "Password must be at least 8 characters long",
     "err_remote_failed": "ការភ្ជាប់ទៅ URL បរាជ័យ ឬត្រូវបានបដិសេធ។",
     "err_remote_forbidden": "ម៉ាស៊ីនបម្រើបានបដិសេធការចូលប្រើ (403 Forbidden)។",
     "err_remote_not_found": "រកមិនឃើញឯកសារនៅ URL នេះទេ (404 Not Found)។",

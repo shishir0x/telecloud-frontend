@@ -427,10 +427,10 @@
                             :placeholder="t('setup_admin_user')" required
                             class="w-full p-4 rounded-xl bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white backdrop-blur-sm transition-all">
                         <input type="password" autocomplete="new-password" x-model="admin_password"
-                            :placeholder="t('setup_admin_pass')" required
+                            :placeholder="t('setup_admin_pass')" minlength="8" required
                             class="w-full p-4 rounded-xl bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white backdrop-blur-sm transition-all">
                         <input type="password" autocomplete="new-password" x-model="admin_confirm"
-                            :placeholder="t('setup_admin_confirm')" required
+                            :placeholder="t('setup_admin_confirm')" minlength="8" required
                             class="w-full p-4 rounded-xl bg-white/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white backdrop-blur-sm transition-all">
                     </div>
                     <button type="submit" :disabled="loading"
@@ -906,6 +906,9 @@
                 },
 
                 async submitAdmin() {
+                    if (Array.from(this.admin_password || '').length < 8) {
+                        return this.showError(this.t('err_password_too_short'));
+                    }
                     if (this.admin_password !== this.admin_confirm) {
                         return this.showError(this.t('setup_pass_mismatch'));
                     }

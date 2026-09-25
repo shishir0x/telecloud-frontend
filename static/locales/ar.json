@@ -188,6 +188,7 @@
     "err_passkey_auth_failed": "فشل مصادقة Passkey",
     "err_passkey_not_configured": "لم يتم تكوين Passkey على هذا النظام. يرجى تكوينه في إعدادات حساب المسؤول.",
     "err_passkey_reg_failed": "فشل تسجيل Passkey",
+    "err_password_too_short": "Password must be at least 8 characters long",
     "err_remote_failed": "فشل الاتصال بالرابط أو تم رفضه.",
     "err_remote_forbidden": "رفض الخادم الوصول (403 Forbidden).",
     "err_remote_not_found": "الملف غير موجود في هذا الرابط (404 Not Found).",

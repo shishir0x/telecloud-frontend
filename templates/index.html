@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="/static/css/style.min.css?v={{ .version }}">
     <script>window.TELECLOUD_VERSION = '{{ .version }}';</script>
     <script src="/static/js/common.min.js?v={{ .version }}"></script>
-    <script>TeleCloud.version = '{{ .version }}';</script>
+    <script>TeleCloud.version = '{{ .version }}'; TeleCloud.githubRepo = 'shishir0x/TeleCloud';</script>
     <script type="module" src="/static/js/script.min.js?v={{ .version }}"></script>
 
 
@@ -2321,12 +2321,12 @@
                                     </div>
                                     <div>
                                         <input type="password" autocomplete="new-password"
-                                            x-model="settingsForm.newPassword" :placeholder="t('new_password')" required
+                                            x-model="settingsForm.newPassword" :placeholder="t('new_password')" minlength="8" required
                                             class="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                                     </div>
                                     <div>
                                         <input type="password" autocomplete="new-password"
-                                            x-model="settingsForm.confirmPassword" :placeholder="t('confirm_password')"
+                                            x-model="settingsForm.confirmPassword" :placeholder="t('confirm_password')" minlength="8"
                                             required
                                             class="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                                     </div>
@@ -2434,7 +2434,7 @@
 
                             <div
                                 class="mt-2 pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 sm:hidden">
-                                <a href="https://github.com/dabeecao/telecloud-go" target="_blank"
+                                <a href="https://github.com/shishir0x/TeleCloud" target="_blank"
                                     class="flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors">
                                     <i class="fa-brands fa-github text-sm"></i>
                                     <span class="font-bold">GitHub</span>
@@ -2450,8 +2450,7 @@
                                 </div>
                                 <p class="font-medium text-center">TeleCloud <span
                                         class="font-bold text-slate-700 dark:text-slate-300"
-                                        x-text="TeleCloud.version"></span> &copy; 2026 <span
-                                        class="text-blue-600 dark:text-blue-400 font-bold">@dabeecao</span></p>
+                                        x-text="TeleCloud.version"></span> &copy; 2026 Original project by <a href="https://github.com/dabeecao" target="_blank" class="text-blue-600 dark:text-blue-400 font-bold hover:underline">@dabeecao</a> · Fork maintained by <a href="https://github.com/shishir0x" target="_blank" class="text-blue-600 dark:text-blue-400 font-bold hover:underline">@shishir0x</a></p>
                             </div>
                         </div>
                     </div>
@@ -3514,15 +3513,14 @@
                             x-text="formatBytes(storageUsed)"></span>
                     </div>
                     <div class="flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors">
-                        <a href="https://github.com/dabeecao/telecloud-go" target="_blank"
+                        <a href="https://github.com/shishir0x/TeleCloud" target="_blank"
                             class="flex items-center gap-1.5">
                             <i class="fa-brands fa-github text-sm"></i>
                             <span>GitHub</span>
                         </a>
                     </div>
                     <p class="font-medium">TeleCloud <span class="font-bold text-slate-700 dark:text-slate-300"
-                            x-text="TeleCloud.version"></span> &copy; 2026 <span
-                            class="text-blue-600 dark:text-blue-400">@dabeecao</span></p>
+                            x-text="TeleCloud.version"></span> &copy; 2026 Original project by <a href="https://github.com/dabeecao" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">@dabeecao</a> · Fork maintained by <a href="https://github.com/shishir0x" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">@shishir0x</a></p>
                 </div>
             </footer>
         </main>

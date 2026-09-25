@@ -188,6 +188,7 @@
     "err_passkey_auth_failed": "Passkey認証に失敗しました",
     "err_passkey_not_configured": "このシステムではPasskeyが設定されていません。管理者のアカウント設定で設定してください。",
     "err_passkey_reg_failed": "Passkey登録に失敗しました",
+    "err_password_too_short": "Password must be at least 8 characters long",
     "err_remote_failed": "URLへの接続に失敗したか、拒否されました。",
     "err_remote_forbidden": "サーバーがアクセスを拒否しました (403 Forbidden)。",
     "err_remote_not_found": "このURLにファイルが見つかりません (404 Not Found)。",
