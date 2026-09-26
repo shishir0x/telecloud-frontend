@@ -6,10 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const STATIC_DOWNLOADS = [
-  { url: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',        out: 'static/js/pdf.min.js' },
-  { url: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', out: 'static/js/pdf.worker.min.js' },
-];
+const STATIC_DOWNLOADS = [];
 
 function download(url, dest) {
   return new Promise((resolve, reject) => {
