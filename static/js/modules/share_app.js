@@ -1875,215 +1875,23 @@ export function shareApp() {
             this.epubViewer.autoScrollSpeed = Math.max(1, Math.min(10, this.epubViewer.autoScrollSpeed + amount));
         },
         openPdfViewer(file, isShare = false, shareToken = '') {
-            this.pdfViewer.show = true;
-            this.pdfViewer.file = file;
-            this.pdfViewer.loading = true;
-            this.pdfViewer.pageLoading = true;
-            this.pdfViewer.sidebarOpen = false;
-            this.pdfViewer.zoom = 'width';
-            this.pdfViewer.pageProgress = 0;
-            this.pdfViewer.loadProgress = 0;
-            this.pdfViewer.currentPage = 1;
-            this.pdfViewer.numPages = 0;
-            this.pdfViewer.settingsOpen = false;
-            this.pdfViewer.toc = [];
-            this.pdfViewer.autoScrollActive = false;
-            this.pdfViewer.autoScrollSpeed = 2;
-            this.pdfViewer.scrollMode = 'continuous';
-            
-            const isDarkGlobal = document.documentElement.classList.contains('dark');
-
             const token = this.shareToken || this.token || shareToken || '';
-            const hasShareToken = !!token;
-            
-            let downloadUrl;
-            if (hasShareToken) {
-                if (file && file.id) {
-                    downloadUrl = `/s/${token}/file/${file.id}/stream`;
-                } else {
-                    downloadUrl = `/s/${token}/stream`;
-                }
-            } else {
-                downloadUrl = this.getPdfStreamUrl(file);
+            const filename = encodeURIComponent((file && file.filename) || this.filename || 'document.pdf');
+            let streamUrl = '';
+            if (this.shareToken) {
+                const fileId = file && file.id ? file.id : '';
+                streamUrl = fileId ? `/s/${this.shareToken}/file/${fileId}/stream/${filename}` : `/s/${this.shareToken}/stream/${filename}`;
+            } else if (this.token || (token && (!file || !file.id))) {
+                const t = this.token || token;
+                streamUrl = `/s/${t}/stream/${filename}`;
+            } else if (token && file && file.id) {
+                streamUrl = `/s/${token}/file/${file.id}/stream/${filename}`;
+            } else if (file && file.id) {
+                streamUrl = `/api/files/${file.id}/stream/${filename}`;
             }
-
-            if (window._pdfLoadingTask) {
-                try { window._pdfLoadingTask.destroy(); } catch(e) {}
-                window._pdfLoadingTask = null;
+            if (streamUrl) {
+                window.open(streamUrl, '_blank', 'noopener,noreferrer');
             }
-            if (window._pdfRenderTask) {
-                try { window._pdfRenderTask.cancel(); } catch(e) {}
-                window._pdfRenderTask = null;
-            }
-            window._pdfDoc = null;
-
-            if (window._pdfResizeHandler) {
-                window.removeEventListener('resize', window._pdfResizeHandler);
-            }
-            window._pdfResizeHandler = () => {
-                if (this.pdfViewer.show && (this.pdfViewer.zoom === 'width' || this.pdfViewer.zoom === 'height')) {
-                    if (window._pdfResizeTimeout) clearTimeout(window._pdfResizeTimeout);
-                    window._pdfResizeTimeout = setTimeout(() => {
-                        if (this.pdfViewer.scrollMode === 'continuous') {
-                            const container = document.getElementById('pdf-continuous-container') || 
-                                              document.getElementById('share-pdf-continuous-container') || 
-                                              document.getElementById('share-folder-pdf-continuous-container');
-                            if (container) {
-                                const wrappers = container.querySelectorAll('.pdf-page-wrapper');
-                                const containerRect = container.getBoundingClientRect();
-                                wrappers.forEach(wrapper => {
-                                    const canvas = wrapper.querySelector('canvas');
-                                    if (canvas) canvas.removeAttribute('data-rendered');
-                                    const rect = wrapper.getBoundingClientRect();
-                                    if (rect.bottom >= containerRect.top && rect.top <= containerRect.bottom) {
-                                        const pageNum = parseInt(wrapper.getAttribute('data-page'), 10);
-                                        this.renderPdfContinuousPage(pageNum);
-                                    }
-                                });
-                            }
-                        } else {
-                            this.renderPdfPage(this.pdfViewer.currentPage);
-                        }
-                    }, 150);
-                }
-            };
-            window.addEventListener('resize', window._pdfResizeHandler);
-
-            this.$nextTick(async () => {
-                try {
-                    await ensurePdfLoaded();
-                    const loadingTask = pdfjsLib.getDocument({
-                        url: downloadUrl,
-                        withCredentials: true,
-                        // Bigger chunks = fewer round-trips while streaming large PDFs
-                        rangeChunkSize: 262144
-                    });
-                    loadingTask.onProgress = (data) => {
-                        if (data && data.total) {
-                            this.pdfViewer.loadProgress = Math.min(100, Math.round((data.loaded / data.total) * 100));
-                        }
-                    };
-                    window._pdfLoadingTask = loadingTask;
-                    
-                    const pdfDoc = await loadingTask.promise;
-                    if (!this.pdfViewer.show || !this.pdfViewer.file || String(this.pdfViewer.file.id || '') !== String(file.id || '') || this.pdfViewer.file.filename !== file.filename) {
-                        return;
-                    }
-                    
-                    window._pdfDoc = pdfDoc;
-                    this.pdfViewer.numPages = pdfDoc.numPages;
-                    // Cache page 1 geometry so unrendered page placeholders match the
-                    // real page size (accurate scroll length, no tall empty gaps).
-                    try {
-                        const firstViewport = (await pdfDoc.getPage(1)).getViewport({ scale: 1 });
-                        window._pdfPageRatio = firstViewport.height / firstViewport.width;
-                    } catch (e) {
-                        window._pdfPageRatio = 1.294;
-                    }
-                    // Force the placeholder width to be recomputed for this document/viewport
-                    window._pdfPlaceholderWidth = null;
-                    this.pdfViewer.loading = false;
-
-                    try {
-                        const outline = await pdfDoc.getOutline();
-                        if (outline && outline.length > 0) {
-                            const resolveOutline = async (items) => {
-                                const result = [];
-                                for (const item of items) {
-                                    let pageNumber = null;
-                                    if (item.dest) {
-                                        try {
-                                            let dest = item.dest;
-                                            if (typeof dest === 'string') {
-                                                dest = await pdfDoc.getDestination(dest);
-                                            }
-                                            if (dest && Array.isArray(dest)) {
-                                                const pageRef = dest[0];
-                                                const pageIndex = await pdfDoc.getPageIndex(pageRef);
-                                                pageNumber = pageIndex + 1;
-                                            }
-                                        } catch (e) {
-                                            console.error("Outline dest resolution error:", e);
-                                        }
-                                    }
-                                    const node = { title: item.title, page: pageNumber };
-                                    if (item.items && item.items.length > 0) {
-                                        node.children = await resolveOutline(item.items);
-                                    }
-                                    result.push(node);
-                                }
-                                return result;
-                            };
-                            const resolved = await resolveOutline(outline);
-                            const flatten = (nodes, depth = 0) => {
-                                let list = [];
-                                nodes.forEach(n => {
-                                    list.push({ title: n.title, page: n.page, depth });
-                                    if (n.children) {
-                                        list = list.concat(flatten(n.children, depth + 1));
-                                    }
-                                });
-                                return list;
-                            };
-                            this.pdfViewer.toc = flatten(resolved);
-                        }
-                    } catch (e) {
-                        console.error("Failed to parse outline:", e);
-                    }
-
-                    let startPage = 1;
-                    if (file && file.id) {
-                        const saved = localStorage.getItem(`pdf-page-${file.id}`);
-                        if (saved) {
-                            const p = parseInt(saved);
-                            if (p >= 1 && p <= pdfDoc.numPages) {
-                                startPage = p;
-                            }
-                        }
-                        // Always open in vertical (continuous) scroll mode; the reader
-                        // toolbar can still switch to single-page mode for this session.
-                        this.pdfViewer.scrollMode = 'continuous';
-                    } else {
-                        this.pdfViewer.scrollMode = 'continuous';
-                    }
-                    this.pdfViewer.currentPage = startPage;
-                    this.pdfViewer.pageProgress = Math.round((startPage / pdfDoc.numPages) * 100);
-                    if (this.pdfViewer.scrollMode === 'continuous') {
-                        this.$nextTick(() => {
-                            this.renderPdfContinuousPage(startPage);
-                            if (startPage + 1 <= pdfDoc.numPages) {
-                                this.renderPdfContinuousPage(startPage + 1);
-                            }
-                            setTimeout(() => {
-                                const container = document.getElementById('pdf-continuous-container') || 
-                                                  document.getElementById('share-pdf-continuous-container') || 
-                                                  document.getElementById('share-folder-pdf-continuous-container');
-                                if (container) {
-                                    const wrapper = container.querySelector(`.pdf-page-wrapper[data-page="${startPage}"]`);
-                                    if (wrapper) {
-                                        wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
-                                    }
-                                }
-                            }, 150);
-                        });
-                    } else {
-                        this.renderPdfPage(startPage);
-                    }
-                    
-                    // Setup pinch-to-zoom gesture on the viewer area
-                    this.$nextTick(() => {
-                        const viewerArea = document.getElementById('pdf-viewer-area');
-                        if (viewerArea) this._setupPdfPinchZoom(viewerArea);
-                    });
-
-                } catch (err) {
-                    console.error("PDF.js initialization failed:", err);
-                    this.showToast(this.t('err_loading_pdf'), 'error');
-                    this.pdfViewer.show = false;
-                    this.pdfViewer.loading = false;
-                    this.pdfViewer.pageLoading = false;
-                }
-            });
         },
         renderPdfPage(pageNumber) {
             if (!window._pdfDoc) return;
